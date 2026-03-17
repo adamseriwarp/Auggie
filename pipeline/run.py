@@ -194,7 +194,6 @@ def main() -> None:
     total_rows = 0
     total_files = 0
     skipped_files = 0
-    total_excluded_rate = 0
 
     for folder in matched:
         csv_files = list_csv_files_in_folder(service, folder["id"])
@@ -219,12 +218,6 @@ def main() -> None:
                 )
                 skipped_files += 1
                 continue
-
-            # Only count quotes with WARP services (non-empty rate)
-            rows_before_filter = len(df)
-            df = df[df['rate'].notna() & (df['rate'].astype(str).str.strip() != '')]
-            rows_excluded = rows_before_filter - len(df)
-            total_excluded_rate += rows_excluded
 
             # Use 3-digit ZIP prefix (SCF zones)
             df['origin3'] = df[ORIGIN_COL].astype(str).str.zfill(5).str[:3]
@@ -261,7 +254,6 @@ def main() -> None:
     print("✅ Pipeline complete")
     print(f"   Files processed   : {total_files:,}  (skipped: {skipped_files})")
     print(f"   Rows processed    : {total_rows:,}")
-    print(f"   Rows excluded     : {total_excluded_rate:,}  (empty rate)")
     print(f"   Unique origins    : {len(origin_counts):,}")
     print(f"   Unique OD pairs   : {unique_od:,}")
     print(f"   origin_counts.json: {origin_out.stat().st_size / 1024:.1f} KB  → {origin_out}")
