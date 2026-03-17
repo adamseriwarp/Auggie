@@ -1,0 +1,13 @@
+[project]
+name = "warp-ltl-pipeline"
+version = "0.1.0"
+description = "WARP LTL quote data pipeline - aggregates Drive CSVs into JSON for the demand map"
+requires-python = ">=3.11"
+
+dependencies = [
+    "google-api-python-client>=2.100.0",
+    "google-auth-httplib2>=0.2.0",
+    "google-auth-oauthlib>=1.1.0",
+    "pandas>=2.0.0",
+    "tqdm>=4.66.0",
+]
