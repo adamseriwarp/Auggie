@@ -11,11 +11,3 @@ dependencies = [
     "pandas>=2.0.0",
     "tqdm>=4.66.0",
 ]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.uv]
-dev-dependencies = []
-

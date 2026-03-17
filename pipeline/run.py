@@ -83,6 +83,8 @@ def list_drive_folders(service, name_pattern: re.Pattern) -> list[dict]:
             fields="nextPageToken, files(id, name)",
             pageSize=200,
             pageToken=page_token,
+            includeItemsFromAllDrives=True,
+            supportsAllDrives=True,
         ).execute()
 
         for f in resp.get("files", []):
@@ -107,13 +109,15 @@ def list_csv_files_in_folder(service, folder_id: str) -> list[dict]:
         q=query,
         fields="files(id, name)",
         pageSize=100,
+        includeItemsFromAllDrives=True,
+        supportsAllDrives=True,
     ).execute()
     return resp.get("files", [])
 
 
 def download_csv(service, file_id: str) -> bytes:
     """Download a Drive file and return its raw bytes."""
-    request = service.files().get_media(fileId=file_id)
+    request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
     buf = io.BytesIO()
     downloader = MediaIoBaseDownload(buf, request)
     done = False
@@ -127,7 +131,7 @@ def download_csv(service, file_id: str) -> bytes:
 def target_week_labels(num_weeks: int = WEEKS_TO_FETCH) -> set[str]:
     """
     Return a set of week folder name strings for the past `num_weeks` weeks.
-    E.g. {"Week 1 2026", "Week 2 2026", ...}
+    Folder format: W{WW}{YY} e.g. "W0126" = Week 1, 2026
     Uses ISO week numbers.
     """
     today = datetime.today()
@@ -136,7 +140,7 @@ def target_week_labels(num_weeks: int = WEEKS_TO_FETCH) -> set[str]:
         d = today - timedelta(weeks=delta)
         iso_week = d.isocalendar()[1]
         year = d.isocalendar()[0]
-        labels.add(f"Week {iso_week} {year}")
+        labels.add(f"W{iso_week:02d}{str(year)[2:]} Quotes")
     return labels
 
 
@@ -170,7 +174,7 @@ def main() -> None:
 
     # Find target week folders
     target_labels = target_week_labels(WEEKS_TO_FETCH)
-    week_pattern = re.compile(r"^Week \d+ \d{4}$")
+    week_pattern = re.compile(r"^W\d{4} Quotes$")
 
     print(f"\n📅 Looking for {WEEKS_TO_FETCH} week folders…")
     all_folders = list_drive_folders(service, week_pattern)
@@ -190,6 +194,7 @@ def main() -> None:
     total_rows = 0
     total_files = 0
     skipped_files = 0
+    total_excluded_rate = 0
 
     for folder in matched:
         csv_files = list_csv_files_in_folder(service, folder["id"])
@@ -215,16 +220,26 @@ def main() -> None:
                 skipped_files += 1
                 continue
 
+            # Only count quotes with WARP services (non-empty rate)
+            rows_before_filter = len(df)
+            df = df[df['rate'].notna() & (df['rate'].astype(str).str.strip() != '')]
+            rows_excluded = rows_before_filter - len(df)
+            total_excluded_rate += rows_excluded
+
+            # Use 3-digit ZIP prefix (SCF zones)
+            df['origin3'] = df[ORIGIN_COL].astype(str).str.zfill(5).str[:3]
+            df['dest3'] = df[DEST_COL].astype(str).str.zfill(5).str[:3]
+
             rows_before = total_rows
             for _, row in df.iterrows():
-                origin = str(row[ORIGIN_COL]).strip().zfill(5)
-                dest = str(row[DEST_COL]).strip().zfill(5)
+                origin3 = str(row['origin3']).strip()
+                dest3 = str(row['dest3']).strip()
 
-                if origin in ("", "nan", "00000") or dest in ("", "nan", "00000"):
+                if origin3 in ("", "nan", "000") or dest3 in ("", "nan", "000"):
                     continue
 
-                origin_counts[origin] += 1
-                od_matrix[origin][dest] += 1
+                origin_counts[origin3] += 1
+                od_matrix[origin3][dest3] += 1
                 total_rows += 1
 
             total_files += 1
@@ -246,6 +261,7 @@ def main() -> None:
     print("✅ Pipeline complete")
     print(f"   Files processed   : {total_files:,}  (skipped: {skipped_files})")
     print(f"   Rows processed    : {total_rows:,}")
+    print(f"   Rows excluded     : {total_excluded_rate:,}  (empty rate)")
     print(f"   Unique origins    : {len(origin_counts):,}")
     print(f"   Unique OD pairs   : {unique_od:,}")
     print(f"   origin_counts.json: {origin_out.stat().st_size / 1024:.1f} KB  → {origin_out}")

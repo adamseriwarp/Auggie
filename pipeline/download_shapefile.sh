@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # download_shapefile.sh
-# Downloads the US Census ZCTA shapefile and converts it to TopoJSON.
-# Output: frontend/public/zcta.topojson
+# Downloads the US Census ZCTA shapefile, dissolves it into 3-digit ZIP prefix zones, and converts to TopoJSON.
+# Output: frontend/public/scf.topojson
 #
 # Usage: bash pipeline/download_shapefile.sh
 #   Run from the repo root.
@@ -13,7 +13,7 @@ TMP_DIR="$(mktemp -d)"
 ZIP_FILE="$TMP_DIR/zcta.zip"
 EXTRACT_DIR="$TMP_DIR/zcta_shp"
 OUTPUT_DIR="frontend/public"
-OUTPUT_FILE="$OUTPUT_DIR/zcta.topojson"
+OUTPUT_FILE="$OUTPUT_DIR/scf.topojson"
 
 echo "=== ZCTA Shapefile Downloader ==="
 echo "Temp dir: $TMP_DIR"
@@ -41,11 +41,13 @@ unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
 SHP_FILE="$(find "$EXTRACT_DIR" -name "*.shp" | head -1)"
 echo "  Shapefile: $SHP_FILE"
 
-# 3. Convert to TopoJSON with simplification
+# 3. Convert to TopoJSON with simplification and dissolve to 3-digit ZIP zones
 echo ""
-echo "[3/4] Converting to TopoJSON (simplify 10%)..."
+echo "[3/4] Converting to TopoJSON, dissolving to 3-digit ZIP zones..."
 mapshaper "$SHP_FILE" \
   -simplify 10% keep-shapes \
+  -each 'ZIP3=ZCTA5CE20.substring(0,3)' \
+  -dissolve2 ZIP3 \
   -o format=topojson "$OUTPUT_FILE"
 
 # 4. Report
