@@ -98,6 +98,28 @@ export default function PricingPriority({ data: compData }) {
         <h2 className="text-xl font-semibold text-gray-800">Pricing Priority</h2>
         <p className="text-sm text-gray-400 mt-1">{sorted.length.toLocaleString()} lanes · ranked by urgency</p>
       </div>
+      {/* Legend */}
+      <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex flex-wrap gap-6 text-xs text-gray-500">
+        <div>
+          <p className="font-semibold text-gray-600 mb-1">Volume Tier</p>
+          <ul className="space-y-0.5">
+            <li>🟢 <span className="font-medium text-gray-700">High</span> — ≥ 500 orders</li>
+            <li>🟡 <span className="font-medium text-gray-700">Medium</span> — 100–499 orders</li>
+            <li>🔴 <span className="font-medium text-gray-700">Low</span> — &lt; 100 orders</li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-semibold text-gray-600 mb-1">Priority Flags</p>
+          <ul className="space-y-0.5">
+            <li>🔴 <span className="font-medium text-gray-700">Raise Price</span> — We're &gt;15% cheaper than competitors AND losing money</li>
+            <li>🔴 <span className="font-medium text-gray-700">Lower Price</span> — We're &gt;15% more expensive AND losing money AND low volume</li>
+            <li>🟠 <span className="font-medium text-gray-700">Capture Margin</span> — We're &gt;15% cheaper AND profitable AND high volume</li>
+            <li>🟡 <span className="font-medium text-gray-700">Vulnerable</span> — We're &gt;15% more expensive AND currently profitable</li>
+            <li>🟢 <span className="font-medium text-gray-700">Healthy</span> — Within ±15% of competitors AND profitable</li>
+          </ul>
+        </div>
+      </div>
+
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50">
