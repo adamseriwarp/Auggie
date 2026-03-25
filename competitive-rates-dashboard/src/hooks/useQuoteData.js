@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Papa from 'papaparse'
 
 function parseRow(row) {
@@ -18,7 +18,40 @@ function parseRow(row) {
 export function useQuoteData() {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/pivot_table_with_airports.csv')
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.text()
+      })
+      .then((text) => {
+        Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const rows = results.data.map(parseRow).filter(
+              (r) => r.zip3_route && r.pct_difference !== null
+            )
+            if (rows.length === 0) {
+              // File exists but is empty or header-only — show uploader silently
+              setLoading(false)
+              return
+            }
+            setData(rows)
+            setLoading(false)
+          },
+          error: () => {
+            setLoading(false)
+          },
+        })
+      })
+      .catch(() => {
+        // Could not fetch default CSV — fall back to uploader silently
+        setLoading(false)
+      })
+  }, [])
 
   function loadFile(file) {
     if (!file || !file.name.endsWith('.csv')) {

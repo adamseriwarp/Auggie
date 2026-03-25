@@ -17,6 +17,14 @@ export default function App() {
   const { data, stats, error, loading, loadFile, reset } = useQuoteData()
   const [activeTab, setActiveTab] = useState('overview')
 
+  if (loading && !data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Loading data…</p>
+      </div>
+    )
+  }
+
   if (!data) {
     return <CsvUploader onFile={loadFile} error={error} loading={loading} />
   }
@@ -32,7 +40,7 @@ export default function App() {
           onClick={reset}
           className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
         >
-          ↩ Upload new CSV
+          ↩ Upload different CSV
         </button>
       </header>
 
