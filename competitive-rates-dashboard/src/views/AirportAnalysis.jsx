@@ -77,7 +77,9 @@ export default function AirportAnalysis({ data }) {
               <td className="px-4 py-2.5 text-gray-600">
                 {row.avg_warp !== null ? `$${row.avg_warp.toFixed(2)}` : '—'}
               </td>
-              <td className="px-4 py-2.5 text-gray-600">{row.avg_rec !== null ? `$${row.avg_rec.toFixed(2)}` : '—'}</td>
+              <td className="px-4 py-2.5 text-gray-600">
+                {row.avg_rec !== null ? `$${row.avg_rec.toFixed(2)}` : '—'}
+              </td>
               <td className="px-4 py-2.5 text-gray-600">
                 {row.avg_comp !== null ? `$${row.avg_comp.toFixed(2)}` : '—'}
               </td>
@@ -91,4 +93,3 @@ export default function AirportAnalysis({ data }) {
     </div>
   )
 }
-
