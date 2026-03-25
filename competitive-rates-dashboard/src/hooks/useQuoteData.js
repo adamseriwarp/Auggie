@@ -12,6 +12,10 @@ function parseRow(row) {
     competitor_carrier: row['competitor_carrier_name'] || '',
     min_warp_rate: parseFloat(row['min_warp_rate']) || null,
     pct_difference: parseFloat(row['pct_difference']) || null,
+    recommended_price: (() => {
+      const minComp = parseFloat(row['min_competitor_rate'])
+      return isNaN(minComp) ? null : Math.round(minComp * 0.95 * 100) / 100
+    })(),
   }
 }
 

@@ -34,6 +34,15 @@ const columns = [
     cell: ({ getValue }) => fmt(getValue(), ''),
     size: 110,
   }),
+  helper.accessor('recommended_price', {
+    header: 'Recommended Price',
+    cell: ({ getValue }) => {
+      const val = getValue()
+      if (val === null || val === undefined) return '—'
+      return `$${val.toFixed(2)}`
+    },
+    size: 150,
+  }),
   helper.accessor('min_competitor_rate', {
     header: 'Competitor Rate*',
     cell: ({ getValue }) => fmt(getValue(), ''),
