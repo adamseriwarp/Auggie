@@ -54,7 +54,7 @@ export default function Overview({ data, stats }) {
           <StatCard
             label="Top Competitor"
             value={stats.topCarrier}
-            sub="by route wins"
+            sub="by routes cheaper than Warp"
           />
         </div>
       </div>

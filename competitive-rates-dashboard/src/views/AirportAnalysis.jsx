@@ -15,16 +15,18 @@ export default function AirportAnalysis({ data }) {
     const map = {}
     data.forEach((r) => {
       const key = `${r.pickup_airport} → ${r.dropoff_airport}`
-      if (!map[key]) map[key] = { pair: key, pickup: r.pickup_airport, dropoff: r.dropoff_airport, pcts: [], warp: [], comp: [] }
+      if (!map[key]) map[key] = { pair: key, pickup: r.pickup_airport, dropoff: r.dropoff_airport, pcts: [], warp: [], comp: [], rec: [] }
       if (r.pct_difference !== null) map[key].pcts.push(r.pct_difference)
       if (r.min_warp_rate !== null) map[key].warp.push(r.min_warp_rate)
       if (r.min_competitor_rate !== null) map[key].comp.push(r.min_competitor_rate)
+      if (r.recommended_price !== null) map[key].rec.push(r.recommended_price)
     })
     return Object.values(map).map((g) => ({
       pair: g.pair,
       route_count: g.pcts.length,
       avg_pct: g.pcts.length ? g.pcts.reduce((a, b) => a + b, 0) / g.pcts.length : null,
       avg_warp: g.warp.length ? g.warp.reduce((a, b) => a + b, 0) / g.warp.length : null,
+      avg_rec: g.rec.length ? g.rec.reduce((a, b) => a + b, 0) / g.rec.length : null,
       avg_comp: g.comp.length ? g.comp.reduce((a, b) => a + b, 0) / g.comp.length : null,
     }))
   }, [data])
@@ -60,6 +62,7 @@ export default function AirportAnalysis({ data }) {
             <Th k="route_count" label="Routes" />
             <Th k="avg_pct" label="Avg % Diff" />
             <Th k="avg_warp" label="Avg Warp Rate" />
+            <Th k="avg_rec" label="Avg Rec Price" />
             <Th k="avg_comp" label="Avg Comp Rate*" />
           </tr>
         </thead>
@@ -74,6 +77,7 @@ export default function AirportAnalysis({ data }) {
               <td className="px-4 py-2.5 text-gray-600">
                 {row.avg_warp !== null ? `$${row.avg_warp.toFixed(2)}` : '—'}
               </td>
+              <td className="px-4 py-2.5 text-gray-600">{row.avg_rec !== null ? `$${row.avg_rec.toFixed(2)}` : '—'}</td>
               <td className="px-4 py-2.5 text-gray-600">
                 {row.avg_comp !== null ? `$${row.avg_comp.toFixed(2)}` : '—'}
               </td>

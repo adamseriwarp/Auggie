@@ -59,7 +59,7 @@ export default function CompetitorBreakdown({ data }) {
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <Th k="carrier" label="Carrier" />
-            <Th k="win_count" label="Routes Won" />
+            <Th k="win_count" label="Cheaper Than Warp" />
             <th className="px-4 py-3 text-left font-medium text-gray-600 whitespace-nowrap">
               Share of Routes
             </th>
