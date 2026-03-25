@@ -11,10 +11,6 @@ const PRIORITY_STYLE = {
   'No Comp Data':   { bg: 'bg-gray-100',   text: 'text-gray-500',   icon: '⚪' },
 }
 
-function percentile(sorted, p) {
-  const idx = Math.floor(sorted.length * p)
-  return sorted[Math.min(idx, sorted.length - 1)]
-}
 
 function computePriority(avgPctDiff, margin, volumeTier) {
   if (avgPctDiff === null) return 'No Comp Data'
@@ -54,16 +50,11 @@ export default function PricingPriority({ data: compData }) {
       }
     })
 
-    // Percentile thresholds for volume
-    const counts = laneData.map((l) => l.orderCount).sort((a, b) => a - b)
-    const p33 = percentile(counts, 0.33)
-    const p67 = percentile(counts, 0.67)
-
     return laneData.map((lane) => {
       const key = `${lane.startMarket}→${lane.endMarket}`
       const comp = compMap[key]
       const avgPctDiff = comp && comp.count > 0 ? comp.sum / comp.count : null
-      const volumeTier = lane.orderCount >= p67 ? 'High' : lane.orderCount <= p33 ? 'Low' : 'Medium'
+      const volumeTier = lane.orderCount >= 500 ? 'High' : lane.orderCount >= 100 ? 'Medium' : 'Low'
       const priority = computePriority(avgPctDiff, lane.margin, volumeTier)
       return { ...lane, avgPctDiff, volumeTier, priority }
     })
