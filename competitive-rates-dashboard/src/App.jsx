@@ -6,6 +6,7 @@ import RouteExplorer from './views/RouteExplorer'
 import AirportAnalysis from './views/AirportAnalysis'
 import CompetitorBreakdown from './views/CompetitorBreakdown'
 import PricingPriority from './views/PricingPriority'
+import PricingReport from './views/PricingReport'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'airports', label: 'Airport Analysis' },
   { id: 'competitors', label: 'Competitor Breakdown' },
   { id: 'pricing', label: 'Pricing Priority' },
+  { id: 'report', label: 'Pricing Report' },
 ]
 
 export default function App() {
@@ -70,6 +72,7 @@ export default function App() {
         {activeTab === 'airports' && <AirportAnalysis data={data} />}
         {activeTab === 'competitors' && <CompetitorBreakdown data={data} />}
         {activeTab === 'pricing' && <PricingPriority data={data} />}
+        {activeTab === 'report' && <PricingReport data={data} />}
       </main>
     </div>
   )
