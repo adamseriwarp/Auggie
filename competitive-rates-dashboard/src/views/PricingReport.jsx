@@ -45,13 +45,12 @@ function computeImpact(lane, action) {
 }
 
 function exportCsv(rows) {
-  const headers = ['Lane','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
+  const headers = ['Lane','Action','Orders','Current Avg Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
   const lines = [headers.join(',')]
   rows.forEach((r) => {
     lines.push([
       r.lane, r.action, r.orderCount,
       r.currentAvgRevPerOrder.toFixed(2),
-      r.avgQuotedWarpRate !== null && r.avgQuotedWarpRate !== undefined ? Math.round(r.avgQuotedWarpRate) : '',
       r.compRate.toFixed(2),
       r.recPrice.toFixed(2),
       r.priceDeltaPct.toFixed(1),
@@ -79,14 +78,10 @@ export default function PricingReport({ data: compData }) {
     const compMap = {}
     compData.forEach((r) => {
       const key = `${r.pickup_airport}→${r.dropoff_airport}`
-      if (!compMap[key]) compMap[key] = { sum: 0, count: 0, warpSum: 0, warpCount: 0 }
+      if (!compMap[key]) compMap[key] = { sum: 0, count: 0 }
       if (r.pct_difference !== null) {
         compMap[key].sum   += r.pct_difference
         compMap[key].count += 1
-      }
-      if (r.min_warp_rate !== null && r.min_warp_rate !== undefined) {
-        compMap[key].warpSum   += r.min_warp_rate
-        compMap[key].warpCount += 1
       }
     })
 
@@ -95,12 +90,11 @@ export default function PricingReport({ data: compData }) {
       const key  = `${lane.startMarket}→${lane.endMarket}`
       const comp = compMap[key]
       const avgPctDiff = comp && comp.count > 0 ? comp.sum / comp.count : null
-      const avgQuotedWarpRate = comp && comp.warpCount > 0 ? comp.warpSum / comp.warpCount : null
       const action = computeAction(avgPctDiff, lane.margin, lane.orderCount)
       if (!action) return                       // exclude non-actionable lanes
 
       const impact = computeImpact({ ...lane, avgPctDiff }, action)
-      result.push({ ...lane, avgPctDiff, avgQuotedWarpRate, action, ...impact })
+      result.push({ ...lane, avgPctDiff, action, ...impact })
     })
 
     // Sort by profitDelta descending
@@ -135,7 +129,7 @@ export default function PricingReport({ data: compData }) {
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
-              {['Lane','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est. New Orders','Revenue Δ','Profit Δ','Current Margin %','Est. New Margin %'].map((h) => (
+              {['Lane','Action','Orders','Current Avg Rate','Comp Rate','Rec Price','Price Δ%','Est. New Orders','Revenue Δ','Profit Δ','Current Margin %','Est. New Margin %'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -155,7 +149,6 @@ export default function PricingReport({ data: compData }) {
                   </td>
                   <td className="px-4 py-3 text-gray-600">{row.orderCount.toLocaleString()}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt$(row.currentAvgRevPerOrder)}</td>
-                  <td className="px-4 py-3 text-gray-600">{row.avgQuotedWarpRate != null ? '$' + Math.round(row.avgQuotedWarpRate).toLocaleString() : '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt$(row.compRate)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt$(row.recPrice)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmtPct(row.priceDeltaPct)}</td>
