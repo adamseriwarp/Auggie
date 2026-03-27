@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Map from './components/Map'
+import CoverageMap from './components/CoverageMap'
+import NavHeader from './components/NavHeader'
 
-export default function App() {
+function DemandMapPage() {
   const [topology, setTopology] = useState(null)
   const [originCounts, setOriginCounts] = useState(null)
   const [odMatrix, setOdMatrix] = useState(null)
@@ -27,5 +30,17 @@ export default function App() {
   }
 
   return <Map topology={topology} originCounts={originCounts} odMatrix={odMatrix} />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <NavHeader />
+      <Routes>
+        <Route path="/" element={<DemandMapPage />} />
+        <Route path="/coverage" element={<CoverageMap />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
