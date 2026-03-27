@@ -33,6 +33,7 @@ SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 CREDENTIALS_FILE = Path(__file__).parent / "credentials.json"
 TOKEN_FILE = Path(__file__).parent / "token.json"
 OUTPUT_DIR = Path(__file__).parent / "output"
+DASHBOARD_PUBLIC_DIR = Path(__file__).parent.parent / "competitive-rates-dashboard" / "public"
 
 # How many past weeks of data to pull (inclusive of current partial week)
 WEEKS_TO_FETCH = 13
@@ -40,6 +41,7 @@ WEEKS_TO_FETCH = 13
 # Columns we care about (case-insensitive match applied at read time)
 ORIGIN_COL = "pickup Zip"
 DEST_COL = "dropoff Zip"
+BOOKED_COL = "BOOKED"
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
@@ -163,10 +165,22 @@ def parse_csv_bytes(data: bytes, filename: str) -> pd.DataFrame | None:
     return None
 
 
+def find_column(columns, target: str) -> str | None:
+    """Return the actual column name matching target, case-insensitively."""
+    normalized = {str(col).strip().lower(): col for col in columns}
+    return normalized.get(target.strip().lower())
+
+
+def is_booked_value(value) -> bool:
+    """Interpret common truthy BOOKED values from Drive CSV exports."""
+    return str(value).strip().lower() in {"true", "t", "1", "yes", "y"}
+
+
 # ── Main ────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    DASHBOARD_PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 
     print("🔐 Authenticating with Google Drive…")
     creds = get_credentials()
@@ -190,6 +204,10 @@ def main() -> None:
     # Aggregate
     origin_counts: dict[str, int] = defaultdict(int)
     od_matrix: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    route_booking_stats: dict[str, dict[str, int]] = defaultdict(lambda: {
+        "quote_count": 0,
+        "booked_count": 0,
+    })
 
     total_rows = 0
     total_files = 0
@@ -211,7 +229,11 @@ def main() -> None:
                 skipped_files += 1
                 continue
 
-            if ORIGIN_COL not in df.columns or DEST_COL not in df.columns:
+            origin_col = find_column(df.columns, ORIGIN_COL)
+            dest_col = find_column(df.columns, DEST_COL)
+            booked_col = find_column(df.columns, BOOKED_COL)
+
+            if origin_col is None or dest_col is None:
                 tqdm.write(
                     f"  ⚠️  {csv_file['name']}: missing columns "
                     f"(found: {list(df.columns)[:6]}…)"
@@ -219,11 +241,15 @@ def main() -> None:
                 skipped_files += 1
                 continue
 
-            # Use 3-digit ZIP prefix (SCF zones)
-            df['origin3'] = df[ORIGIN_COL].astype(str).str.zfill(5).str[:3]
-            df['dest3'] = df[DEST_COL].astype(str).str.zfill(5).str[:3]
+            if booked_col is None:
+                tqdm.write(
+                    f"  ⚠️  {csv_file['name']}: missing BOOKED column; booked counts will default to false."
+                )
 
-            rows_before = total_rows
+            # Use 3-digit ZIP prefix (SCF zones)
+            df['origin3'] = df[origin_col].astype(str).str.zfill(5).str[:3]
+            df['dest3'] = df[dest_col].astype(str).str.zfill(5).str[:3]
+
             for _, row in df.iterrows():
                 origin3 = str(row['origin3']).strip()
                 dest3 = str(row['dest3']).strip()
@@ -233,6 +259,10 @@ def main() -> None:
 
                 origin_counts[origin3] += 1
                 od_matrix[origin3][dest3] += 1
+                route_key = f"{origin3}-{dest3}"
+                route_booking_stats[route_key]["quote_count"] += 1
+                if booked_col is not None and is_booked_value(row[booked_col]):
+                    route_booking_stats[route_key]["booked_count"] += 1
                 total_rows += 1
 
             total_files += 1
@@ -240,12 +270,36 @@ def main() -> None:
     # Write outputs
     origin_out = OUTPUT_DIR / "origin_counts.json"
     od_out = OUTPUT_DIR / "od_matrix.json"
+    booking_out = OUTPUT_DIR / "route_booking_stats.json"
+    dashboard_booking_out = DASHBOARD_PUBLIC_DIR / "route_booking_stats.json"
 
     # Convert defaultdicts to plain dicts for JSON serialisation
     plain_od = {o: dict(dests) for o, dests in od_matrix.items()}
+    plain_route_booking = {
+        route: {
+            "quote_count": stats["quote_count"],
+            "booked_count": stats["booked_count"],
+            "book_rate": (stats["booked_count"] / stats["quote_count"]) if stats["quote_count"] else 0,
+        }
+        for route, stats in sorted(route_booking_stats.items())
+    }
+    total_quotes = sum(stats["quote_count"] for stats in plain_route_booking.values())
+    total_booked = sum(stats["booked_count"] for stats in plain_route_booking.values())
+    booking_payload = {
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "weeks": [f["name"] for f in matched],
+        "totals": {
+            "quote_count": total_quotes,
+            "booked_count": total_booked,
+            "book_rate": (total_booked / total_quotes) if total_quotes else 0,
+        },
+        "routes": plain_route_booking,
+    }
 
     origin_out.write_text(json.dumps(dict(origin_counts), indent=2))
     od_out.write_text(json.dumps(plain_od, indent=2))
+    booking_out.write_text(json.dumps(booking_payload, indent=2))
+    dashboard_booking_out.write_text(json.dumps(booking_payload, indent=2))
 
     unique_od = sum(len(dests) for dests in plain_od.values())
 
@@ -258,6 +312,12 @@ def main() -> None:
     print(f"   Unique OD pairs   : {unique_od:,}")
     print(f"   origin_counts.json: {origin_out.stat().st_size / 1024:.1f} KB  → {origin_out}")
     print(f"   od_matrix.json    : {od_out.stat().st_size / 1024:.1f} KB  → {od_out}")
+    print(
+        f"   route_booking_stats.json: {booking_out.stat().st_size / 1024:.1f} KB  → {booking_out}"
+    )
+    print(
+        f"   dashboard booking stats : {dashboard_booking_out.stat().st_size / 1024:.1f} KB  → {dashboard_booking_out}"
+    )
     print("─" * 50)
 
 
