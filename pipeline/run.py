@@ -42,6 +42,7 @@ WEEKS_TO_FETCH = 13
 ORIGIN_COL = "pickup Zip"
 DEST_COL = "dropoff Zip"
 BOOKED_COL = "BOOKED"
+RATE_COL = "rate"
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────────
@@ -209,6 +210,14 @@ def main() -> None:
         "booked_count": 0,
     })
 
+    # 5-digit ZIP service coverage aggregations
+    serviced_origin_zip5: dict[str, int] = defaultdict(int)
+    unserviced_origin_zip5: dict[str, int] = defaultdict(int)
+    serviced_dest_zip5: dict[str, int] = defaultdict(int)
+    unserviced_dest_zip5: dict[str, int] = defaultdict(int)
+    od_serviced: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    od_unserviced: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
     total_rows = 0
     total_files = 0
     skipped_files = 0
@@ -232,6 +241,7 @@ def main() -> None:
             origin_col = find_column(df.columns, ORIGIN_COL)
             dest_col = find_column(df.columns, DEST_COL)
             booked_col = find_column(df.columns, BOOKED_COL)
+            rate_col = find_column(df.columns, RATE_COL)
 
             if origin_col is None or dest_col is None:
                 tqdm.write(
@@ -246,9 +256,17 @@ def main() -> None:
                     f"  ⚠️  {csv_file['name']}: missing BOOKED column; booked counts will default to false."
                 )
 
+            if rate_col is None:
+                tqdm.write(
+                    f"  ⚠️  {csv_file['name']}: missing rate column; all rows will be treated as unserviced."
+                )
+
             # Use 3-digit ZIP prefix (SCF zones)
             df['origin3'] = df[origin_col].astype(str).str.zfill(5).str[:3]
             df['dest3'] = df[dest_col].astype(str).str.zfill(5).str[:3]
+            # Use full 5-digit ZIP (zero-padded)
+            df['origin5'] = df[origin_col].astype(str).str.zfill(5).str[:5]
+            df['dest5'] = df[dest_col].astype(str).str.zfill(5).str[:5]
 
             for _, row in df.iterrows():
                 origin3 = str(row['origin3']).strip()
@@ -264,6 +282,25 @@ def main() -> None:
                 if booked_col is not None and is_booked_value(row[booked_col]):
                     route_booking_stats[route_key]["booked_count"] += 1
                 total_rows += 1
+
+                # 5-digit ZIP service coverage (US ZIPs only: all digits)
+                origin5 = str(row['origin5']).strip()
+                dest5 = str(row['dest5']).strip()
+                if origin5.isdigit() and dest5.isdigit() and origin5 != "00000" and dest5 != "00000":
+                    rate_val = row[rate_col] if rate_col is not None else None
+                    is_serviced = (
+                        rate_col is not None
+                        and rate_val is not None
+                        and str(rate_val).strip() not in ("", "nan")
+                    )
+                    if is_serviced:
+                        serviced_origin_zip5[origin5] += 1
+                        serviced_dest_zip5[dest5] += 1
+                        od_serviced[origin5][dest5] += 1
+                    else:
+                        unserviced_origin_zip5[origin5] += 1
+                        unserviced_dest_zip5[dest5] += 1
+                        od_unserviced[origin5][dest5] += 1
 
             total_files += 1
 
@@ -301,6 +338,21 @@ def main() -> None:
     booking_out.write_text(json.dumps(booking_payload, indent=2))
     dashboard_booking_out.write_text(json.dumps(booking_payload, indent=2))
 
+    # Write 6 new 5-digit ZIP service coverage files
+    serviced_origin_out = OUTPUT_DIR / "serviced_origin_zips.json"
+    unserviced_origin_out = OUTPUT_DIR / "unserviced_origin_zips.json"
+    serviced_dest_out = OUTPUT_DIR / "serviced_dest_zips.json"
+    unserviced_dest_out = OUTPUT_DIR / "unserviced_dest_zips.json"
+    od_serviced_out = OUTPUT_DIR / "od_serviced.json"
+    od_unserviced_out = OUTPUT_DIR / "od_unserviced.json"
+
+    serviced_origin_out.write_text(json.dumps(dict(serviced_origin_zip5), indent=2))
+    unserviced_origin_out.write_text(json.dumps(dict(unserviced_origin_zip5), indent=2))
+    serviced_dest_out.write_text(json.dumps(dict(serviced_dest_zip5), indent=2))
+    unserviced_dest_out.write_text(json.dumps(dict(unserviced_dest_zip5), indent=2))
+    od_serviced_out.write_text(json.dumps({o: dict(d) for o, d in od_serviced.items()}, indent=2))
+    od_unserviced_out.write_text(json.dumps({o: dict(d) for o, d in od_unserviced.items()}, indent=2))
+
     unique_od = sum(len(dests) for dests in plain_od.values())
 
     # Summary
@@ -318,6 +370,16 @@ def main() -> None:
     print(
         f"   dashboard booking stats : {dashboard_booking_out.stat().st_size / 1024:.1f} KB  → {dashboard_booking_out}"
     )
+    print(f"   Unique serviced origin zips   : {len(serviced_origin_zip5):,}")
+    print(f"   Unique unserviced origin zips : {len(unserviced_origin_zip5):,}")
+    print(f"   Unique serviced dest zips     : {len(serviced_dest_zip5):,}")
+    print(f"   Unique unserviced dest zips   : {len(unserviced_dest_zip5):,}")
+    print(f"   serviced_origin_zips.json : {serviced_origin_out.stat().st_size / 1024:.1f} KB  → {serviced_origin_out}")
+    print(f"   unserviced_origin_zips.json: {unserviced_origin_out.stat().st_size / 1024:.1f} KB  → {unserviced_origin_out}")
+    print(f"   serviced_dest_zips.json   : {serviced_dest_out.stat().st_size / 1024:.1f} KB  → {serviced_dest_out}")
+    print(f"   unserviced_dest_zips.json : {unserviced_dest_out.stat().st_size / 1024:.1f} KB  → {unserviced_dest_out}")
+    print(f"   od_serviced.json          : {od_serviced_out.stat().st_size / 1024:.1f} KB  → {od_serviced_out}")
+    print(f"   od_unserviced.json        : {od_unserviced_out.stat().st_size / 1024:.1f} KB  → {od_unserviced_out}")
     print("─" * 50)
 
 
