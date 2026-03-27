@@ -10,11 +10,6 @@ const ACTION_STYLE = {
 function fmt$(n)   { return '$' + Math.round(n).toLocaleString() }
 function fmtPct(n) { return (n > 0 ? '+' : '') + n.toFixed(1) + '%' }
 
-function fmtRate(n) {
-  if (n === null || n === undefined || isNaN(n)) return '—'
-  return `${(n * 100).toFixed(1)}%`
-}
-
 function csvValue(val) {
   if (val === null || val === undefined) return ''
   const str = String(val)
@@ -56,14 +51,11 @@ function computeImpact(lane, action) {
 }
 
 function exportCsv(rows) {
-  const headers = ['Route','Pickup ZIP3','Dropoff ZIP3','Action','Orders','Quoted','Booked','Book Rate','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
+  const headers = ['Route','Pickup ZIP3','Dropoff ZIP3','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
   const lines = [headers.join(',')]
   rows.forEach((r) => {
     const values = [
       r.zip3Route, r.pickupZip3, r.dropoffZip3, r.action, r.orderCount,
-      r.quote_count ?? '',
-      r.booked_count ?? '',
-      r.book_rate !== null && r.book_rate !== undefined ? (r.book_rate * 100).toFixed(1) : '',
       r.currentAvgRevPerOrder.toFixed(2),
       r.avgQuotedWarpRate !== null && r.avgQuotedWarpRate !== undefined ? Math.round(r.avgQuotedWarpRate) : '',
       r.compRate.toFixed(2),
@@ -84,7 +76,7 @@ function exportCsv(rows) {
   URL.revokeObjectURL(url)
 }
 
-export default function PricingReport({ data: compData, bookingStats = {} }) {
+export default function PricingReport({ data: compData }) {
   const { routeData, loading, error } = usePnlData()
 
   const rows = useMemo(() => {
@@ -113,7 +105,6 @@ export default function PricingReport({ data: compData, bookingStats = {} }) {
     const result = []
     routeData.forEach((route) => {
       const comp = compMap[route.zip3Route]
-      const booking = bookingStats[route.zip3Route] || { quote_count: null, booked_count: null, book_rate: null }
       const avgPctDiff = comp && comp.count > 0 ? comp.sum / comp.count : null
       const avgQuotedWarpRate = comp && comp.warpCount > 0 ? comp.warpSum / comp.warpCount : null
       const avgCompRate = comp && comp.compCount > 0 ? comp.compSum / comp.compCount : null
@@ -121,13 +112,13 @@ export default function PricingReport({ data: compData, bookingStats = {} }) {
       if (!action || avgCompRate === null) return
 
       const impact = computeImpact({ ...route, compRate: avgCompRate }, action)
-      result.push({ ...route, ...booking, avgPctDiff, avgQuotedWarpRate, action, ...impact })
+      result.push({ ...route, avgPctDiff, avgQuotedWarpRate, action, ...impact })
     })
 
     // Sort by profitDelta descending
     result.sort((a, b) => b.profitDelta - a.profitDelta)
     return result
-  }, [routeData, compData, bookingStats])
+  }, [routeData, compData])
 
   if (loading) return <div className="flex items-center justify-center py-20 text-gray-400 text-sm">Loading P&L data…</div>
   if (error)   return <div className="flex items-center justify-center py-20 text-red-500 text-sm">{error}</div>
@@ -156,7 +147,7 @@ export default function PricingReport({ data: compData, bookingStats = {} }) {
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
-              {['Route','Action','Orders','Quoted','Booked','Book Rate','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est. New Orders','Revenue Δ','Profit Δ','Current Margin %','Est. New Margin %'].map((h) => (
+              {['Route','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est. New Orders','Revenue Δ','Profit Δ','Current Margin %','Est. New Margin %'].map((h) => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -175,9 +166,6 @@ export default function PricingReport({ data: compData, bookingStats = {} }) {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600">{row.orderCount.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-gray-600">{row.quote_count !== null && row.quote_count !== undefined ? row.quote_count.toLocaleString() : '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{row.booked_count !== null && row.booked_count !== undefined ? row.booked_count.toLocaleString() : '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{fmtRate(row.book_rate)}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt$(row.currentAvgRevPerOrder)}</td>
                   <td className="px-4 py-3 text-gray-600">{row.avgQuotedWarpRate != null ? '$' + Math.round(row.avgQuotedWarpRate).toLocaleString() : '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{fmt$(row.compRate)}</td>

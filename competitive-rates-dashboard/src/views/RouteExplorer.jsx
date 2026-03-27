@@ -24,11 +24,6 @@ function fmtPct(val) {
   return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`
 }
 
-function fmtRate(val) {
-  if (val === null || val === undefined || isNaN(val)) return '—'
-  return `${(val * 100).toFixed(1)}%`
-}
-
 function csvValue(val) {
   if (val === null || val === undefined) return ''
   const str = String(val)
@@ -42,9 +37,6 @@ function exportRowsToCsv(rows) {
     'Pickup Airport',
     'Dropoff Airport',
     'Airports',
-    'Quoted',
-    'Booked',
-    'Book Rate',
     'Warp Rate',
     'Recommended Price',
     'Competitor Rate',
@@ -60,9 +52,6 @@ function exportRowsToCsv(rows) {
       r.pickup_airport,
       r.dropoff_airport,
       `${r.pickup_airport} → ${r.dropoff_airport}`,
-      r.quote_count ?? '',
-      r.booked_count ?? '',
-      r.book_rate !== null && r.book_rate !== undefined ? (r.book_rate * 100).toFixed(1) : '',
       r.min_warp_rate !== null ? r.min_warp_rate.toFixed(2) : '',
       r.recommended_price !== null ? r.recommended_price.toFixed(2) : '',
       r.min_competitor_rate !== null ? r.min_competitor_rate.toFixed(2) : '',
@@ -85,27 +74,6 @@ const columns = [
   helper.accessor('zip3_route', { header: 'Route', size: 100 }),
   helper.accessor(r => `${r.pickup_airport} → ${r.dropoff_airport}`, {
     id: 'airport_pair', header: 'Airports', size: 120,
-  }),
-  helper.accessor('quote_count', {
-    header: 'Quoted',
-    cell: ({ getValue }) => {
-      const val = getValue()
-      return val !== null && val !== undefined ? val.toLocaleString() : '—'
-    },
-    size: 90,
-  }),
-  helper.accessor('booked_count', {
-    header: 'Booked',
-    cell: ({ getValue }) => {
-      const val = getValue()
-      return val !== null && val !== undefined ? val.toLocaleString() : '—'
-    },
-    size: 90,
-  }),
-  helper.accessor('book_rate', {
-    header: 'Book Rate',
-    cell: ({ getValue }) => fmtRate(getValue()),
-    size: 100,
   }),
   helper.accessor('min_warp_rate', {
     header: 'Warp Rate',
@@ -138,7 +106,7 @@ const columns = [
 
 function uniq(arr) { return [...new Set(arr)].filter(Boolean).sort() }
 
-export default function RouteExplorer({ data, bookingStats = {} }) {
+export default function RouteExplorer({ data }) {
   const [search, setSearch] = useState('')
   const [pickupAirport, setPickupAirport] = useState('')
   const [dropoffAirport, setDropoffAirport] = useState('')
@@ -151,19 +119,14 @@ export default function RouteExplorer({ data, bookingStats = {} }) {
   const dropoffAirports = useMemo(() => uniq(data.map(r => r.dropoff_airport)), [data])
   const carriers = useMemo(() => uniq(data.map(r => r.competitor_carrier)), [data])
 
-  const rows = useMemo(() => data.map((row) => ({
-    ...row,
-    ...(bookingStats[row.zip3_route] || { quote_count: null, booked_count: null, book_rate: null }),
-  })), [data, bookingStats])
-
-  const filtered = useMemo(() => rows.filter(r => {
+  const filtered = useMemo(() => data.filter(r => {
     if (search && !r.zip3_route.includes(search)) return false
     if (pickupAirport && r.pickup_airport !== pickupAirport) return false
     if (dropoffAirport && r.dropoff_airport !== dropoffAirport) return false
     if (carrier && r.competitor_carrier !== carrier) return false
     if (r.pct_difference !== null && (r.pct_difference < pctMin || r.pct_difference > pctMax)) return false
     return true
-  }), [rows, search, pickupAirport, dropoffAirport, carrier, pctMin, pctMax])
+  }), [data, search, pickupAirport, dropoffAirport, carrier, pctMin, pctMax])
 
   const table = useReactTable({
     data: filtered, columns, state: { sorting },
