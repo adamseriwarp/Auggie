@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react'
 import Papa from 'papaparse'
 
+const PNL_CSV_PATH = '/order_pnl_export_2026-01-01_2026-03-25.csv'
+
+function parseNumber(...values) {
+  for (const value of values) {
+    const parsed = parseFloat(value)
+    if (!isNaN(parsed)) return parsed
+  }
+  return null
+}
+
 export function usePnlData() {
   const [laneData, setLaneData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/pnl_export_2026-01-01_2026-03-25.csv')
+    fetch(PNL_CSV_PATH)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.text()
@@ -39,10 +49,10 @@ export function usePnlData() {
               const entry = laneMap[key]
               const code = row['orderCode']
               if (code) entry.orderCodes.add(code)
-              const rev = parseFloat(row['correctedRevenue'])
-              const cost = parseFloat(row['correctedCost'])
-              if (!isNaN(rev)) entry.totalRevenue += rev
-              if (!isNaN(cost)) entry.totalCost += cost
+              const rev = parseNumber(row['correctedRevenue'], row['revenue'])
+              const cost = parseNumber(row['correctedCost'], row['cost'])
+              if (rev !== null) entry.totalRevenue += rev
+              if (cost !== null) entry.totalCost += cost
             })
 
             const lanes = Object.values(laneMap).map((l) => {
