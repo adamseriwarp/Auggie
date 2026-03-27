@@ -45,11 +45,11 @@ function computeImpact(lane, action) {
 }
 
 function exportCsv(rows) {
-  const headers = ['Lane','Start Market','End Market','Zip3 Routes','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
+  const headers = ['Lane','Action','Orders','Current Avg Rate','Quoted Warp Rate','Comp Rate','Rec Price','Price Δ%','Est New Orders','Revenue Δ','Profit Δ','Current Margin %','Est New Margin %']
   const lines = [headers.join(',')]
   rows.forEach((r) => {
     lines.push([
-      r.lane, r.startMarket, r.endMarket, `"${r.zip3Routes}"`, r.action, r.orderCount,
+      r.lane, r.action, r.orderCount,
       r.currentAvgRevPerOrder.toFixed(2),
       r.avgQuotedWarpRate !== null && r.avgQuotedWarpRate !== undefined ? Math.round(r.avgQuotedWarpRate) : '',
       r.compRate.toFixed(2),
@@ -79,7 +79,7 @@ export default function PricingReport({ data: compData }) {
     const compMap = {}
     compData.forEach((r) => {
       const key = `${r.pickup_airport}→${r.dropoff_airport}`
-      if (!compMap[key]) compMap[key] = { sum: 0, count: 0, warpSum: 0, warpCount: 0, zip3Routes: new Set() }
+      if (!compMap[key]) compMap[key] = { sum: 0, count: 0, warpSum: 0, warpCount: 0 }
       if (r.pct_difference !== null) {
         compMap[key].sum   += r.pct_difference
         compMap[key].count += 1
@@ -88,7 +88,6 @@ export default function PricingReport({ data: compData }) {
         compMap[key].warpSum   += r.min_warp_rate
         compMap[key].warpCount += 1
       }
-      if (r.zip3_route) compMap[key].zip3Routes.add(r.zip3_route)
     })
 
     const result = []
@@ -101,8 +100,7 @@ export default function PricingReport({ data: compData }) {
       if (!action) return                       // exclude non-actionable lanes
 
       const impact = computeImpact({ ...lane, avgPctDiff }, action)
-      const zip3Routes = comp ? [...comp.zip3Routes].join('; ') : ''
-      result.push({ ...lane, avgPctDiff, avgQuotedWarpRate, action, zip3Routes, ...impact })
+      result.push({ ...lane, avgPctDiff, avgQuotedWarpRate, action, ...impact })
     })
 
     // Sort by profitDelta descending
