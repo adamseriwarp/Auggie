@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Papa from 'papaparse'
 
-const PNL_CSV_PATH = '/order_pnl_export_2026-01-01_2026-03-25.csv'
+const PNL_CSV_PATH = '/ltl_order_pnl_export_2026-01-01_2026-03-25.csv'
 
 function parseNumber(...values) {
   for (const value of values) {
