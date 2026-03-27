@@ -1,17 +1,43 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import DeckGL from '@deck.gl/react'
 import { GeoJsonLayer } from '@deck.gl/layers'
 import { Map as MapGL } from 'react-map-gl/maplibre'
 import * as topojson from 'topojson-client'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import crossdocks from '../data/crossdocks.json'
 
 const INITIAL_VIEW = { longitude: -98.35, latitude: 39.5, zoom: 4, pitch: 0, bearing: 0 }
 const BASEMAP = 'https://basemaps.cartocdn.com/gl/positron-nolabels-gl-style/style.json'
+const PROXIMITY_MAX = 500
+const DEBOUNCE_MS = 150
 
 // Color constants
 const COLOR_SERVICED = [34, 139, 34, 200]       // green
 const COLOR_UNSERVICED = [220, 80, 40, 200]     // red-orange
 const COLOR_NO_DATA = [180, 180, 180, 120]      // gray
+
+/** Haversine distance in miles between two lat/lng points */
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 3958.8
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+/**
+ * Normalize zip data from either array format (mock) or { zip: count } object (pipeline).
+ * Returns { zips: string[], counts: { zip: number } }
+ */
+function normalizeZipData(data) {
+  if (Array.isArray(data)) {
+    const counts = {}
+    data.forEach(z => { counts[z] = 1 })
+    return { zips: data, counts }
+  }
+  return { zips: Object.keys(data), counts: data }
+}
 
 function getZipColor(zip, servicedSet, unservicedSet) {
   if (servicedSet.has(zip)) return COLOR_SERVICED
@@ -31,6 +57,15 @@ export default function CoverageMap() {
   const [selectedZip, setSelectedZip] = useState(null)
   const [hoverInfo, setHoverInfo] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Filter state (applies to unserviced ZIPs only)
+  const [proximityMiles, setProximityMiles] = useState(PROXIMITY_MAX)
+  const [proximityMilesDisplay, setProximityMilesDisplay] = useState(PROXIMITY_MAX)
+  const [proximityMode, setProximityMode] = useState('crossdock') // 'crossdock' | 'serviced'
+  const [demandMin, setDemandMin] = useState(0)
+  const [demandMinDisplay, setDemandMinDisplay] = useState(0)
+  const proximityTimer = useRef(null)
+  const demandTimer = useRef(null)
 
   useEffect(() => {
     Promise.all([
@@ -59,26 +94,142 @@ export default function CoverageMap() {
     return topojson.feature(topology, topology.objects[key])
   }, [topology])
 
-  // Compute which zips are colored based on view mode and selected zip
+  // Pre-compute zip centroids from ZCTA topojson properties (run once on load)
+  const zipCentroids = useMemo(() => {
+    if (!geojson) return {}
+    const centroids = {}
+    geojson.features.forEach(f => {
+      const zip = f.properties.ZCTA5CE20
+      const lat = parseFloat(f.properties.INTPTLAT20)
+      const lng = parseFloat(f.properties.INTPTLON20)
+      if (!isNaN(lat) && !isNaN(lng)) centroids[zip] = { lat, lng }
+    })
+    return centroids
+  }, [geojson])
+
+  // Normalize serviced/unserviced data (handles both array and { zip: count } formats)
+  const { servicedOriginSet } = useMemo(() => {
+    const { zips } = normalizeZipData(servicedOrigins)
+    return { servicedOriginSet: new Set(zips) }
+  }, [servicedOrigins])
+
+  const { servicedDestSet } = useMemo(() => {
+    const { zips } = normalizeZipData(servicedDests)
+    return { servicedDestSet: new Set(zips) }
+  }, [servicedDests])
+
+  const { unservicedOriginSet, unservicedOriginCounts } = useMemo(() => {
+    const { zips, counts } = normalizeZipData(unservicedOrigins)
+    return { unservicedOriginSet: new Set(zips), unservicedOriginCounts: counts }
+  }, [unservicedOrigins])
+
+  const { unservicedDestSet, unservicedDestCounts } = useMemo(() => {
+    const { zips, counts } = normalizeZipData(unservicedDests)
+    return { unservicedDestSet: new Set(zips), unservicedDestCounts: counts }
+  }, [unservicedDests])
+
+  // Pre-compute min distance from each zip centroid to any crossdock (runs once after centroids load)
+  const crossdockDistances = useMemo(() => {
+    const distances = {}
+    Object.entries(zipCentroids).forEach(([zip, { lat, lng }]) => {
+      let minDist = Infinity
+      crossdocks.forEach(cd => {
+        const d = haversine(lat, lng, cd.lat, cd.lng)
+        if (d < minDist) minDist = d
+      })
+      distances[zip] = minDist
+    })
+    return distances
+  }, [zipCentroids])
+
+  // Pre-compute min distance from each unserviced zip to the nearest serviced zip centroid.
+  // Only computed when proximityMode === 'serviced' (lazy — skip otherwise).
+  const servicedDistances = useMemo(() => {
+    if (proximityMode !== 'serviced') return {}
+    if (Object.keys(zipCentroids).length === 0) return {}
+    const currentServicedSet = viewMode === 'origin' ? servicedOriginSet : servicedDestSet
+    const currentUnservicedSet = viewMode === 'origin' ? unservicedOriginSet : unservicedDestSet
+    const distances = {}
+    currentUnservicedSet.forEach(zip => {
+      const c = zipCentroids[zip]
+      if (!c) { distances[zip] = Infinity; return }
+      let minDist = Infinity
+      currentServicedSet.forEach(sZip => {
+        const sc = zipCentroids[sZip]
+        if (!sc) return
+        const d = haversine(c.lat, c.lng, sc.lat, sc.lng)
+        if (d < minDist) minDist = d
+      })
+      distances[zip] = minDist
+    })
+    return distances
+  }, [proximityMode, viewMode, zipCentroids, servicedOriginSet, servicedDestSet, unservicedOriginSet, unservicedDestSet])
+
+  // Max demand value for slider range
+  const maxDemand = useMemo(() => {
+    const counts = viewMode === 'origin' ? unservicedOriginCounts : unservicedDestCounts
+    const vals = Object.values(counts)
+    return vals.length > 0 ? Math.max(...vals) : 1
+  }, [viewMode, unservicedOriginCounts, unservicedDestCounts])
+
+  // Reset filter state when switching view modes
+  useEffect(() => {
+    setProximityMiles(PROXIMITY_MAX)
+    setProximityMilesDisplay(PROXIMITY_MAX)
+    setDemandMin(0)
+    setDemandMinDisplay(0)
+  }, [viewMode])
+
+  // Debounced slider handlers
+  const handleProximityChange = val => {
+    setProximityMilesDisplay(val)
+    clearTimeout(proximityTimer.current)
+    proximityTimer.current = setTimeout(() => setProximityMiles(val), DEBOUNCE_MS)
+  }
+
+  const handleDemandChange = val => {
+    setDemandMinDisplay(val)
+    clearTimeout(demandTimer.current)
+    demandTimer.current = setTimeout(() => setDemandMin(val), DEBOUNCE_MS)
+  }
+
+  // Compute which zips are colored based on view mode, selected zip, and active filters
   const { servicedSet, unservicedSet } = useMemo(() => {
     if (selectedZip) {
-      // Click-through: show destinations reachable from selected origin
+      // Click-through: show OD pairs for the selected zip (no filter applied)
       const sSet = new Set(odServiced[selectedZip] || [])
       const uSet = new Set(odUnserviced[selectedZip] || [])
       return { servicedSet: sSet, unservicedSet: uSet }
     }
-    if (viewMode === 'origin') {
-      return {
-        servicedSet: new Set(servicedOrigins),
-        unservicedSet: new Set(unservicedOrigins)
-      }
-    } else {
-      return {
-        servicedSet: new Set(servicedDests),
-        unservicedSet: new Set(unservicedDests)
-      }
+
+    const currentServicedSet = viewMode === 'origin' ? servicedOriginSet : servicedDestSet
+    const currentUnservicedSet = viewMode === 'origin' ? unservicedOriginSet : unservicedDestSet
+    const currentCounts = viewMode === 'origin' ? unservicedOriginCounts : unservicedDestCounts
+    const filtersActive = proximityMiles < PROXIMITY_MAX || demandMin > 0
+
+    if (!filtersActive) {
+      return { servicedSet: currentServicedSet, unservicedSet: currentUnservicedSet }
     }
-  }, [viewMode, selectedZip, servicedOrigins, unservicedOrigins, servicedDests, unservicedDests, odServiced, odUnserviced])
+
+    // Apply filters to unserviced zips only
+    const filtered = new Set()
+    currentUnservicedSet.forEach(zip => {
+      // Demand filter
+      if (demandMin > 0 && (currentCounts[zip] || 0) < demandMin) return
+      // Proximity filter
+      if (proximityMiles < PROXIMITY_MAX) {
+        const dist = proximityMode === 'crossdock'
+          ? (crossdockDistances[zip] ?? Infinity)
+          : (servicedDistances[zip] ?? Infinity)
+        if (dist > proximityMiles) return
+      }
+      filtered.add(zip)
+    })
+
+    return { servicedSet: currentServicedSet, unservicedSet: filtered }
+  }, [viewMode, selectedZip, servicedOriginSet, servicedDestSet, unservicedOriginSet, unservicedDestSet,
+    unservicedOriginCounts, unservicedDestCounts, odServiced, odUnserviced,
+    proximityMiles, proximityMode, demandMin, crossdockDistances, servicedDistances])
 
   const layers = useMemo(() => {
     if (!geojson) return []
@@ -190,6 +341,84 @@ export default function CoverageMap() {
         )}
       </div>
 
+      {/* Filter Panel — applies to unserviced ZIPs only */}
+      {!selectedZip && (
+        <div style={{
+          position: 'absolute', left: 16, top: 100,
+          background: 'rgba(255,255,255,0.97)', borderRadius: 8,
+          padding: '14px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          fontSize: 12, color: '#333', width: 230, zIndex: 10
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 13, color: '#222' }}>
+            Filters <span style={{ fontWeight: 400, color: '#888' }}>(unserviced only)</span>
+          </div>
+
+          {/* Proximity slider */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Proximity:{' '}
+              <span style={{ color: '#1e64ff' }}>
+                {proximityMilesDisplay >= PROXIMITY_MAX ? 'All' : `≤ ${proximityMilesDisplay} mi`}
+              </span>
+            </div>
+            <input
+              type="range" min={0} max={PROXIMITY_MAX} step={10}
+              value={proximityMilesDisplay}
+              onChange={e => handleProximityChange(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#1e64ff' }}
+            />
+            <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>0 mi — 500 mi (All)</div>
+            {/* Proximity mode toggle */}
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['crossdock', 'serviced'].map(mode => (
+                <button key={mode} onClick={() => setProximityMode(mode)} style={{
+                  flex: 1, border: 'none', borderRadius: 4, padding: '4px 0', fontSize: 11,
+                  fontWeight: 600, cursor: 'pointer',
+                  background: proximityMode === mode ? '#1e64ff' : '#eee',
+                  color: proximityMode === mode ? '#fff' : '#555'
+                }}>
+                  {mode === 'crossdock' ? 'Nearest Crossdock' : 'Nearest Serviced'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Demand slider */}
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Min demand:{' '}
+              <span style={{ color: '#1e64ff' }}>
+                {demandMinDisplay === 0 ? 'All' : `≥ ${demandMinDisplay}`}
+              </span>
+            </div>
+            <input
+              type="range" min={0} max={maxDemand || 1} step={1}
+              value={demandMinDisplay}
+              onChange={e => handleDemandChange(Number(e.target.value))}
+              style={{ width: '100%', accentColor: '#1e64ff' }}
+            />
+            <div style={{ fontSize: 11, color: '#888' }}>0 (All) — {maxDemand} missed quotes</div>
+          </div>
+
+          {/* Reset filters button — only shown when filters are active */}
+          {(proximityMiles < PROXIMITY_MAX || demandMin > 0) && (
+            <button
+              onClick={() => {
+                setProximityMiles(PROXIMITY_MAX); setProximityMilesDisplay(PROXIMITY_MAX)
+                setDemandMin(0); setDemandMinDisplay(0)
+              }}
+              style={{
+                marginTop: 12, width: '100%', border: 'none', borderRadius: 5,
+                padding: '5px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: '#f3f3f3', color: '#555'
+              }}
+            >
+              Reset filters
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Legend */}
       <div style={{
         position: 'absolute', bottom: 32, right: 16,
@@ -220,6 +449,11 @@ export default function CoverageMap() {
         }}>
           <div><strong>ZIP: {hoverInfo.zip}</strong></div>
           <div>{hoverInfo.status}</div>
+          {hoverInfo.status === 'Unserviced' && (() => {
+            const counts = viewMode === 'origin' ? unservicedOriginCounts : unservicedDestCounts
+            const count = counts[hoverInfo.zip]
+            return count != null ? <div style={{ color: '#ffd' }}>{count} missed quote{count !== 1 ? 's' : ''}</div> : null
+          })()}
         </div>
       )}
     </div>

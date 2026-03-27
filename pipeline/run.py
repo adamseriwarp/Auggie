@@ -350,8 +350,8 @@ def main() -> None:
     unserviced_origin_out.write_text(json.dumps(dict(unserviced_origin_zip5), indent=2))
     serviced_dest_out.write_text(json.dumps(dict(serviced_dest_zip5), indent=2))
     unserviced_dest_out.write_text(json.dumps(dict(unserviced_dest_zip5), indent=2))
-    od_serviced_out.write_text(json.dumps({o: dict(d) for o, d in od_serviced.items()}, indent=2))
-    od_unserviced_out.write_text(json.dumps({o: dict(d) for o, d in od_unserviced.items()}, indent=2))
+    od_serviced_out.write_text(json.dumps({o: list(d.keys()) for o, d in od_serviced.items()}, indent=2))
+    od_unserviced_out.write_text(json.dumps({o: list(d.keys()) for o, d in od_unserviced.items()}, indent=2))
 
     unique_od = sum(len(dests) for dests in plain_od.values())
 
