@@ -11,35 +11,8 @@ function parseNumber(...values) {
   return null
 }
 
-function parseZip3(value) {
-  const digits = String(value ?? '').trim().replace(/\D/g, '')
-  if (!digits) return ''
-  return digits.padStart(5, '0').slice(0, 3)
-}
-
-function summarizePnlGroups(groupMap) {
-  return Object.values(groupMap).map((group) => {
-    const orderCount = group.orderCodes.size
-    const totalRevenue = group.totalRevenue
-    const totalCost = group.totalCost
-    const margin =
-      totalRevenue !== 0
-        ? ((totalRevenue - totalCost) / totalRevenue) * 100
-        : null
-
-    return {
-      ...group,
-      orderCount,
-      totalRevenue,
-      totalCost,
-      margin,
-    }
-  })
-}
-
 export function usePnlData() {
   const [laneData, setLaneData] = useState(null)
-  const [routeData, setRouteData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -56,62 +29,52 @@ export function usePnlData() {
           complete: (results) => {
             const rows = results.data
 
+            // Group by startMarket → endMarket lane
             const laneMap = {}
-            const routeMap = {}
-
             rows.forEach((row) => {
-              const code = row['orderCode']
-              const rev = parseNumber(row['correctedRevenue'], row['revenue'])
-              const cost = parseNumber(row['correctedCost'], row['cost'])
-
-              // Group by startMarket → endMarket lane
               const start = row['startMarket'] || ''
               const end = row['endMarket'] || ''
-              if (start && end) {
-                const laneKey = `${start}→${end}`
-                if (!laneMap[laneKey]) {
-                  laneMap[laneKey] = {
-                    startMarket: start,
-                    endMarket: end,
-                    lane: `${start} → ${end}`,
-                    orderCodes: new Set(),
-                    totalRevenue: 0,
-                    totalCost: 0,
-                  }
+              if (!start || !end) return
+              const key = `${start}→${end}`
+              if (!laneMap[key]) {
+                laneMap[key] = {
+                  startMarket: start,
+                  endMarket: end,
+                  lane: `${start} → ${end}`,
+                  orderCodes: new Set(),
+                  totalRevenue: 0,
+                  totalCost: 0,
                 }
-                const laneEntry = laneMap[laneKey]
-                if (code) laneEntry.orderCodes.add(code)
-                if (rev !== null) laneEntry.totalRevenue += rev
-                if (cost !== null) laneEntry.totalCost += cost
               }
+              const entry = laneMap[key]
+              const code = row['orderCode']
+              if (code) entry.orderCodes.add(code)
+              const rev = parseNumber(row['correctedRevenue'], row['revenue'])
+              const cost = parseNumber(row['correctedCost'], row['cost'])
+              if (rev !== null) entry.totalRevenue += rev
+              if (cost !== null) entry.totalCost += cost
+            })
 
-              // Group by ZIP3 route to align with Route Explorer
-              const pickupZip3 = parseZip3(row['pickZipCode'])
-              const dropoffZip3 = parseZip3(row['dropZipCode'])
-              if (pickupZip3 && dropoffZip3) {
-                const zip3Route = `${pickupZip3}-${dropoffZip3}`
-                if (!routeMap[zip3Route]) {
-                  routeMap[zip3Route] = {
-                    zip3Route,
-                    pickupZip3,
-                    dropoffZip3,
-                    orderCodes: new Set(),
-                    totalRevenue: 0,
-                    totalCost: 0,
-                  }
-                }
-                const routeEntry = routeMap[zip3Route]
-                if (code) routeEntry.orderCodes.add(code)
-                if (rev !== null) routeEntry.totalRevenue += rev
-                if (cost !== null) routeEntry.totalCost += cost
+            const lanes = Object.values(laneMap).map((l) => {
+              const orderCount = l.orderCodes.size
+              const totalRevenue = l.totalRevenue
+              const totalCost = l.totalCost
+              const margin =
+                totalRevenue !== 0
+                  ? ((totalRevenue - totalCost) / totalRevenue) * 100
+                  : null
+              return {
+                startMarket: l.startMarket,
+                endMarket: l.endMarket,
+                lane: l.lane,
+                orderCount,
+                totalRevenue,
+                totalCost,
+                margin,
               }
             })
 
-            const lanes = summarizePnlGroups(laneMap)
-            const routes = summarizePnlGroups(routeMap)
-
             setLaneData(lanes)
-            setRouteData(routes)
             setLoading(false)
           },
           error: (err) => {
@@ -126,6 +89,6 @@ export function usePnlData() {
       })
   }, [])
 
-  return { laneData, routeData, loading, error }
+  return { laneData, loading, error }
 }
 
