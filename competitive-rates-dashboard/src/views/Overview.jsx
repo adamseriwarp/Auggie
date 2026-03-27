@@ -12,6 +12,11 @@ function StatCard({ label, value, sub, color }) {
   )
 }
 
+function fmtRate(val) {
+  if (val === null || val === undefined || isNaN(val)) return '—'
+  return `${(val * 100).toFixed(1)}%`
+}
+
 function buildBuckets(data) {
   const buckets = [
     { label: '< −20%', min: -Infinity, max: -20, color: '#16a34a' },
@@ -25,15 +30,21 @@ function buildBuckets(data) {
   }))
 }
 
-export default function Overview({ data, stats }) {
+export default function Overview({ data, stats, bookingTotals }) {
   const buckets = buildBuckets(data)
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <StatCard label="Total Routes" value={stats.total.toLocaleString()} />
+          <StatCard
+            label="API Quote Book Rate"
+            value={fmtRate(bookingTotals?.book_rate)}
+            sub={bookingTotals ? `${bookingTotals.booked_count.toLocaleString()} of ${bookingTotals.quote_count.toLocaleString()} quotes booked` : 'Raw quote stats unavailable'}
+            color="text-blue-600"
+          />
           <StatCard
             label="Warp Cheaper"
             value={`${stats.cheaperPct}%`}

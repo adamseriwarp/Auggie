@@ -1,20 +1,26 @@
 import { useState } from 'react'
 import { useQuoteData } from './hooks/useQuoteData'
+import { useBookingStats } from './hooks/useBookingStats'
 import CsvUploader from './components/CsvUploader'
 import Overview from './views/Overview'
 import RouteExplorer from './views/RouteExplorer'
 import AirportAnalysis from './views/AirportAnalysis'
 import CompetitorBreakdown from './views/CompetitorBreakdown'
+import PricingPriority from './views/PricingPriority'
+import PricingReport from './views/PricingReport'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'routes', label: 'Route Explorer' },
   { id: 'airports', label: 'Airport Analysis' },
   { id: 'competitors', label: 'Competitor Breakdown' },
+  { id: 'pricing', label: 'Pricing Priority' },
+  { id: 'report', label: 'Pricing Report' },
 ]
 
 export default function App() {
   const { data, stats, error, loading, loadFile, reset } = useQuoteData()
+  const { routeStats, totals: bookingTotals } = useBookingStats()
   const [activeTab, setActiveTab] = useState('overview')
 
   if (loading && !data) {
@@ -63,10 +69,12 @@ export default function App() {
       </nav>
 
       <main className="px-6 py-6 max-w-7xl mx-auto">
-        {activeTab === 'overview' && <Overview data={data} stats={stats} />}
-        {activeTab === 'routes' && <RouteExplorer data={data} />}
+        {activeTab === 'overview' && <Overview data={data} stats={stats} bookingTotals={bookingTotals} />}
+        {activeTab === 'routes' && <RouteExplorer data={data} bookingStats={routeStats} />}
         {activeTab === 'airports' && <AirportAnalysis data={data} />}
         {activeTab === 'competitors' && <CompetitorBreakdown data={data} />}
+        {activeTab === 'pricing' && <PricingPriority data={data} />}
+        {activeTab === 'report' && <PricingReport data={data} bookingStats={routeStats} />}
       </main>
     </div>
   )

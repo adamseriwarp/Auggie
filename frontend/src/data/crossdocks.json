@@ -1,0 +1,236 @@
+[
+  {
+    "id": "WTCH-ATL-4",
+    "address": "610 Waterfront Dr. SW, Atlanta, GA 30336",
+    "lat": 33.764833,
+    "lng": -84.542543
+  },
+  {
+    "id": "WTCH-ATL-5",
+    "address": "105 Southfield Pkwy. Forest Park, GA, 30297",
+    "lat": 33.601526,
+    "lng": -84.382351
+  },
+  {
+    "id": "WTCH-BDL-1",
+    "address": "110 Murphy Rd. Hartford, CT 06114",
+    "lat": 41.736063,
+    "lng": -72.657462
+  },
+  {
+    "id": "WTCH-BNA-2",
+    "address": "515 Airpark Center Dr. Nashville, TN 37217",
+    "lat": 36.098432,
+    "lng": -86.679846
+  },
+  {
+    "id": "WTCH-BOI-1",
+    "address": "2674 South Fry St #106, Boise, ID 83709",
+    "lat": 43.578474,
+    "lng": -116.264939
+  },
+  {
+    "id": "WTCH-BOS-1",
+    "address": "40 Robbie Rd. Avon, MA 02322",
+    "lat": 42.131062,
+    "lng": -71.061238
+  },
+  {
+    "id": "WTCH-BWI-2",
+    "address": "1321 Mercedes Dr. Ste# N, Hanover, MD 21076",
+    "lat": 39.166464,
+    "lng": -76.705744
+  },
+  {
+    "id": "WTCH-CLT-1",
+    "address": "10240 Western Ridge Rd. Charlotte, NC 28273",
+    "lat": 35.114024,
+    "lng": -80.947583
+  },
+  {
+    "id": "WTCH-CMH-3",
+    "address": "1700 Georgesville Rd. Columbus, OH 43228",
+    "lat": 39.917086,
+    "lng": -83.138834
+  },
+  {
+    "id": "WTCH-DCA-1",
+    "address": "9610 Gunston Cove Rd. Ste# B1, Lorton, VA 22079",
+    "lat": 38.696559,
+    "lng": -77.224391
+  },
+  {
+    "id": "WTCH-DEN-2",
+    "address": "11929 East 51st Ave. Denver, CO 80239",
+    "lat": 39.790383,
+    "lng": -104.849708
+  },
+  {
+    "id": "WTCH-DSM-1",
+    "address": "10400 Hickman Rd. Dr #2, Clive, IA 50325",
+    "lat": 41.614675,
+    "lng": -93.760863
+  },
+  {
+    "id": "WTCH-DTW-1",
+    "address": "13038 Pauline Dr. Shelby Township, MI 48315",
+    "lat": 42.6655,
+    "lng": -82.999806
+  },
+  {
+    "id": "WTCH-EWR-4",
+    "address": "340 South Stiles St. Linden, NJ 07036",
+    "lat": 40.624119,
+    "lng": -74.25076
+  },
+  {
+    "id": "WTCH-IAH-2",
+    "address": "1297 N. Post Oak Rd. Ste #100, Houston, TX 77055",
+    "lat": 29.792356,
+    "lng": -95.457079
+  },
+  {
+    "id": "WTCH-IND-1",
+    "address": "5150 Decatur Blvd. Ste #D, Indianapolis, IN 46241",
+    "lat": 39.688093,
+    "lng": -86.288177
+  },
+  {
+    "id": "WTCH-LAS-3",
+    "address": "4050 W. Sunset Rd. Suite #B, Las Vegas, NV 89118",
+    "lat": 36.071768,
+    "lng": -115.195228
+  },
+  {
+    "id": "WTCH-LAX-9",
+    "address": "1305 Wholesale St. Los Angeles, CA 90021",
+    "lat": 34.036686,
+    "lng": -118.23492
+  },
+  {
+    "id": "WTCH-MCI-1",
+    "address": "3177 Mercier St. Kansas City, MO 64111",
+    "lat": 39.068672,
+    "lng": -94.600893
+  },
+  {
+    "id": "WTCH-MCI-2",
+    "address": "2225 NE Town Centre Blvd., Lee's Summit, MO 64064",
+    "lat": 38.9534,
+    "lng": -94.364216
+  },
+  {
+    "id": "WTCH-MCO-1",
+    "address": "1401 Tradeport Dr. Ste# 100, Orlando, FL 32824",
+    "lat": 28.416885,
+    "lng": -81.361778
+  },
+  {
+    "id": "WTCH-MCO-2",
+    "address": "603 W. Landstreet Rd. Orlando, FL 32824",
+    "lat": 28.436164,
+    "lng": -81.385859
+  },
+  {
+    "id": "WTCH-MIA-2",
+    "address": "20600 NW. 47th Ave. Miami Gardens, FL 33055",
+    "lat": 25.963676,
+    "lng": -80.278326
+  },
+  {
+    "id": "WTCH-MSP-1",
+    "address": "2811 Beverly Dr. Ste #100, Eagan, MN 55121",
+    "lat": 44.854973,
+    "lng": -93.136934
+  },
+  {
+    "id": "WTCH-OKC-2",
+    "address": "1700 South Eastern Ave. Oklahoma City, OK 73129",
+    "lat": 35.448712,
+    "lng": -97.476892
+  },
+  {
+    "id": "WTCH-ORD-1",
+    "address": "720 East Green St. Bensenville, IL 60106",
+    "lat": 41.951723,
+    "lng": -87.927836
+  },
+  {
+    "id": "WTCH-PNS-1",
+    "address": "6020 Enterprise Dr, Pensacola, FL 32505",
+    "lat": 30.478223,
+    "lng": -87.266084
+  },
+  {
+    "id": "WTCH-RDU-1",
+    "address": "3921 South Miami Blvd. Ste# 100. Durham, NC 27703",
+    "lat": 35.909579,
+    "lng": -78.851309
+  },
+  {
+    "id": "WTCH-SAN-2",
+    "address": "12455 Kerran St #300, Poway, CA 92064",
+    "lat": 32.939992,
+    "lng": -117.054017
+  },
+  {
+    "id": "WTCH-SCK-1",
+    "address": "1111 Navy Dr. Stockton, CA 95206",
+    "lat": 37.937545,
+    "lng": -121.30296
+  },
+  {
+    "id": "WTCH-SEA-1",
+    "address": "2302 West Valley Highway North, Bldg. B #500, Auburn, WA 98001",
+    "lat": 47.328056,
+    "lng": -122.249732
+  },
+  {
+    "id": "WTCH-SFO-1",
+    "address": "2071 Ringwood Ave. Ste# D, San Jose, CA 95131",
+    "lat": 37.393293,
+    "lng": -121.897719
+  },
+  {
+    "id": "WTCH-SLC-3",
+    "address": "2275 South 900 West, Salt Lake City, UT 84119",
+    "lat": 40.721045,
+    "lng": -111.917374
+  },
+  {
+    "id": "WTCH-SLC-4",
+    "address": "1950 North 2200 West, Salt Lake City, UT 84116",
+    "lat": 40.810637,
+    "lng": -111.953487
+  },
+  {
+    "id": "WTCH-SLC-5",
+    "address": "1775 S. 5200 West Suite B, Salt Lake City, UT 84104",
+    "lat": 40.731265,
+    "lng": -112.015506
+  },
+  {
+    "id": "WTCH-TPA-2",
+    "address": "1841 Massaro Blvd. Tampa, FL 33619",
+    "lat": 27.959176,
+    "lng": -82.362366
+  },
+  {
+    "id": "WTCH-PIT-1",
+    "address": "740 Commonwealth Dr. Warrendale, PA 15086",
+    "lat": 40.675379,
+    "lng": -80.10635
+  },
+  {
+    "id": "WTCH-BUF-1",
+    "address": "40 Stanley St. Buffalo, NY 14206",
+    "lat": 42.892239,
+    "lng": -78.813185
+  },
+  {
+    "id": "WTCH-MEM-1",
+    "address": "4226 Clarke Rd. Memphis, TN 38141",
+    "lat": 35.032595,
+    "lng": -89.875039
+  }
+]
