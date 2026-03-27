@@ -24,52 +24,6 @@ function fmtPct(val) {
   return `${val > 0 ? '+' : ''}${val.toFixed(1)}%`
 }
 
-function csvValue(val) {
-  if (val === null || val === undefined) return ''
-  const str = String(val)
-  if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`
-  return str
-}
-
-function exportRowsToCsv(rows) {
-  const headers = [
-    'Route',
-    'Pickup Airport',
-    'Dropoff Airport',
-    'Airports',
-    'Warp Rate',
-    'Recommended Price',
-    'Competitor Rate',
-    'Carrier',
-    'Pct Diff',
-  ]
-
-  const lines = [headers.join(',')]
-  rows.forEach((row) => {
-    const r = row.original
-    const values = [
-      r.zip3_route,
-      r.pickup_airport,
-      r.dropoff_airport,
-      `${r.pickup_airport} → ${r.dropoff_airport}`,
-      r.min_warp_rate !== null ? r.min_warp_rate.toFixed(2) : '',
-      r.recommended_price !== null ? r.recommended_price.toFixed(2) : '',
-      r.min_competitor_rate !== null ? r.min_competitor_rate.toFixed(2) : '',
-      r.competitor_carrier,
-      r.pct_difference !== null ? r.pct_difference.toFixed(1) : '',
-    ]
-    lines.push(values.map(csvValue).join(','))
-  })
-
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'route_explorer_export.csv'
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
 const columns = [
   helper.accessor('zip3_route', { header: 'Route', size: 100 }),
   helper.accessor(r => `${r.pickup_airport} → ${r.dropoff_airport}`, {
@@ -135,7 +89,6 @@ export default function RouteExplorer({ data }) {
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   })
-  const visibleRows = table.getRowModel().rows
 
   function Select({ value, onChange, options, placeholder }) {
     return (
@@ -168,16 +121,7 @@ export default function RouteExplorer({ data }) {
           <input type="number" value={pctMax} onChange={e => setPctMax(Number(e.target.value))}
             className="border border-gray-200 rounded px-2 py-1.5 w-20 text-sm focus:outline-none" />
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          <button
-            onClick={() => exportRowsToCsv(visibleRows)}
-            disabled={visibleRows.length === 0}
-            className="text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Export CSV
-          </button>
-          <span className="text-sm text-gray-400">{filtered.length} routes</span>
-        </div>
+        <span className="text-sm text-gray-400 ml-auto">{filtered.length} routes</span>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-auto">
