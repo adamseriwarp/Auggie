@@ -221,6 +221,10 @@ def main() -> None:
 
     # 3-digit SCF-level service coverage (parallel to od_serviced but keyed on 3-digit prefix)
     od_serviced_3digit: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    # zip5 sub-pairs within each zip3 pair: { origin3: { dest3: { origin5: { dest5: count } } } }
+    od_serviced_3digit_zip5: dict[str, dict[str, dict[str, dict[str, int]]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    )
 
     total_rows = 0
     total_files = 0
@@ -302,6 +306,7 @@ def main() -> None:
                         serviced_dest_zip5[dest5] += 1
                         od_serviced[origin5][dest5] += 1
                         od_serviced_3digit[origin3][dest3] += 1
+                        od_serviced_3digit_zip5[origin3][dest3][origin5][dest5] += 1
                     else:
                         unserviced_origin_zip5[origin5] += 1
                         unserviced_dest_zip5[dest5] += 1
@@ -371,8 +376,19 @@ def main() -> None:
     )
     with top_serviced_lanes_out.open("w", newline="") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["origin3", "dest3", "count"])
-        writer.writerows(top_serviced_rows)
+        writer.writerow(["origin3", "dest3", "count", "top_zip5_origin", "top_zip5_dest", "top_zip5_count"])
+        for origin3, dest3, count in top_serviced_rows:
+            zip5_pairs = od_serviced_3digit_zip5.get(origin3, {}).get(dest3, {})
+            top_o5, top_d5, top_c = max(
+                (
+                    (o5, d5, c)
+                    for o5, dests5 in zip5_pairs.items()
+                    for d5, c in dests5.items()
+                ),
+                key=lambda t: t[2],
+                default=("", "", 0),
+            )
+            writer.writerow([origin3, dest3, count, top_o5, top_d5, top_c])
 
     unique_od = sum(len(dests) for dests in plain_od.values())
 
