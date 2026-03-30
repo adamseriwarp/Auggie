@@ -11,6 +11,7 @@ On first run: opens browser for Google OAuth. Caches token in token.json.
 
 from __future__ import annotations
 
+import csv
 import io
 import json
 import os
@@ -218,6 +219,9 @@ def main() -> None:
     od_serviced: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     od_unserviced: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
+    # 3-digit SCF-level service coverage (parallel to od_serviced but keyed on 3-digit prefix)
+    od_serviced_3digit: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
     total_rows = 0
     total_files = 0
     skipped_files = 0
@@ -297,6 +301,7 @@ def main() -> None:
                         serviced_origin_zip5[origin5] += 1
                         serviced_dest_zip5[dest5] += 1
                         od_serviced[origin5][dest5] += 1
+                        od_serviced_3digit[origin3][dest3] += 1
                     else:
                         unserviced_origin_zip5[origin5] += 1
                         unserviced_dest_zip5[dest5] += 1
@@ -353,6 +358,22 @@ def main() -> None:
     od_serviced_out.write_text(json.dumps({o: list(d.keys()) for o, d in od_serviced.items()}, indent=2))
     od_unserviced_out.write_text(json.dumps({o: list(d.keys()) for o, d in od_unserviced.items()}, indent=2))
 
+    # Write top serviced lanes at 3-digit SCF level, sorted by count descending
+    top_serviced_lanes_out = OUTPUT_DIR / "top_serviced_lanes.csv"
+    top_serviced_rows = sorted(
+        (
+            (origin3, dest3, count)
+            for origin3, dests in od_serviced_3digit.items()
+            for dest3, count in dests.items()
+        ),
+        key=lambda r: r[2],
+        reverse=True,
+    )
+    with top_serviced_lanes_out.open("w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["origin3", "dest3", "count"])
+        writer.writerows(top_serviced_rows)
+
     unique_od = sum(len(dests) for dests in plain_od.values())
 
     # Summary
@@ -380,6 +401,7 @@ def main() -> None:
     print(f"   unserviced_dest_zips.json : {unserviced_dest_out.stat().st_size / 1024:.1f} KB  → {unserviced_dest_out}")
     print(f"   od_serviced.json          : {od_serviced_out.stat().st_size / 1024:.1f} KB  → {od_serviced_out}")
     print(f"   od_unserviced.json        : {od_unserviced_out.stat().st_size / 1024:.1f} KB  → {od_unserviced_out}")
+    print(f"   top_serviced_lanes.csv    : {top_serviced_lanes_out.stat().st_size / 1024:.1f} KB  ({len(top_serviced_rows):,} rows)  → {top_serviced_lanes_out}")
     print("─" * 50)
 
 
