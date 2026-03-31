@@ -5,19 +5,21 @@ pickup/dropoff zip code data into JSON files for the demand map.
 
 Usage:
     uv run python run.py
+    uv run python run.py --start-date 2026-02-28 --end-date 2026-03-30
 
 On first run: opens browser for Google OAuth. Caches token in token.json.
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import io
 import json
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -148,6 +150,42 @@ def target_week_labels(num_weeks: int = WEEKS_TO_FETCH) -> set[str]:
     return labels
 
 
+def parse_week_folder_date_range(folder_name: str) -> tuple[date, date] | None:
+    """
+    Parse a folder name like 'W0226 Quotes' → (week_start, week_end) as date objects.
+    W{WW}{YY} Quotes: WW = ISO week number, YY = 2-digit year.
+    Returns None if the name doesn't match.
+    """
+    m = re.match(r"^W(\d{2})(\d{2}) Quotes$", folder_name)
+    if not m:
+        return None
+    iso_week = int(m.group(1))
+    year = 2000 + int(m.group(2))
+    # %G = ISO year, %V = ISO week, %u = ISO weekday (1=Monday)
+    week_start = datetime.strptime(f"{year}-W{iso_week:02d}-1", "%G-W%V-%u").date()
+    week_end = week_start + timedelta(days=6)
+    return week_start, week_end
+
+
+def folder_in_date_range(
+    folder_name: str,
+    start_date: date | None,
+    end_date: date | None,
+) -> bool:
+    """Return True if the folder's week overlaps with [start_date, end_date]."""
+    if start_date is None and end_date is None:
+        return True
+    date_range = parse_week_folder_date_range(folder_name)
+    if date_range is None:
+        return True  # can't parse → include by default
+    week_start, week_end = date_range
+    if start_date is not None and week_end < start_date:
+        return False
+    if end_date is not None and week_start > end_date:
+        return False
+    return True
+
+
 # ── CSV parsing ─────────────────────────────────────────────────────────────────
 
 def parse_csv_bytes(data: bytes, filename: str) -> pd.DataFrame | None:
@@ -181,6 +219,29 @@ def is_booked_value(value) -> bool:
 # ── Main ────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="WARP LTL Quote Demand Pipeline")
+    parser.add_argument(
+        "--start-date",
+        type=lambda s: datetime.strptime(s, "%Y-%m-%d").date(),
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Only include week folders whose week overlaps with this start date.",
+    )
+    parser.add_argument(
+        "--end-date",
+        type=lambda s: datetime.strptime(s, "%Y-%m-%d").date(),
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="Only include week folders whose week overlaps with this end date.",
+    )
+    args = parser.parse_args()
+    start_date: date | None = args.start_date
+    end_date: date | None = args.end_date
+
+    date_filter_active = start_date is not None or end_date is not None
+    if date_filter_active:
+        print(f"📆 Date filter active: {start_date or '(unbounded)'} → {end_date or '(unbounded)'}")
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     DASHBOARD_PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -195,6 +256,13 @@ def main() -> None:
     print(f"\n📅 Looking for {WEEKS_TO_FETCH} week folders…")
     all_folders = list_drive_folders(service, week_pattern)
     matched = [f for f in all_folders if f["name"] in target_labels]
+
+    # Apply date range filter at folder level
+    if date_filter_active:
+        before = len(matched)
+        matched = [f for f in matched if folder_in_date_range(f["name"], start_date, end_date)]
+        print(f"   Date filter: kept {len(matched)} of {before} week folder(s)")
+
     matched.sort(key=lambda f: f["name"])
 
     if not matched:
@@ -364,7 +432,12 @@ def main() -> None:
     od_unserviced_out.write_text(json.dumps({o: list(d.keys()) for o, d in od_unserviced.items()}, indent=2))
 
     # Write top serviced lanes at 3-digit SCF level, sorted by count descending
-    top_serviced_lanes_out = OUTPUT_DIR / "top_serviced_lanes.csv"
+    if date_filter_active:
+        start_str = start_date.strftime("%Y%m%d") if start_date else "open"
+        end_str = end_date.strftime("%Y%m%d") if end_date else "open"
+        top_serviced_lanes_out = OUTPUT_DIR / f"top_serviced_lanes_{start_str}_{end_str}.csv"
+    else:
+        top_serviced_lanes_out = OUTPUT_DIR / "top_serviced_lanes.csv"
     top_serviced_rows = sorted(
         (
             (origin3, dest3, count)
