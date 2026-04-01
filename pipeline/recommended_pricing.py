@@ -49,7 +49,7 @@ quotes["competitor_carrier"] = quotes["Cheapest Non-Warp Carrier"].str.strip()
 demand["origin3"] = demand["origin3"].str.strip()
 demand["dest3"]   = demand["dest3"].str.strip()
 
-demand_cols = ["origin3", "dest3", "total_quotes", "ltl_shipments", "quadrant"]
+demand_cols = ["origin3", "dest3", "ltl_shipments", "quadrant"]
 demand_slim = demand[demand_cols].copy()
 
 df = quotes.merge(demand_slim, on=["origin3", "dest3"], how="left")
@@ -58,10 +58,11 @@ df = quotes.merge(demand_slim, on=["origin3", "dest3"], how="left")
 pivot["origin3"] = pivot["origin3"].str.strip()
 pivot["dest3"]   = pivot["dest3"].str.strip()
 
-pivot_slim = pivot[["origin3", "dest3", "booked_quotes"]].copy()
+pivot_slim = pivot[["origin3", "dest3", "booked_quotes", "total_quotes"]].copy()
 
 df = df.merge(pivot_slim, on=["origin3", "dest3"], how="left")
 df["booked_quotes"] = pd.to_numeric(df["booked_quotes"], errors="coerce").fillna(0).astype(int)
+df["total_quotes"]  = pd.to_numeric(df["total_quotes"],  errors="coerce").fillna(0).astype(int)
 
 # ── left-join January rates ───────────────────────────────────────────────────
 jan["origin3"] = jan["origin3"].str.strip()
@@ -158,6 +159,14 @@ for _, r in top10.iterrows():
 print("\n" + "=" * 70)
 print(f"  ✓  Saved {OUTPUT_CSV.relative_to(HERE.parent)}")
 print("=" * 70 + "\n")
+
+# ── total_quotes coverage ─────────────────────────────────────────────────────
+tq_nonzero = (df["total_quotes"] > 0).sum()
+tq_zero    = (df["total_quotes"] == 0).sum()
+print(f"  total_quotes coverage (from ltl_pivot_table):")
+print(f"    Routes with total_quotes > 0 : {tq_nonzero:>4}")
+print(f"    Routes with total_quotes = 0 : {tq_zero:>4}  (not in Google Drive data)")
+print()
 
 # ── sample: 5 rows showing booked_quotes ──────────────────────────────────────
 print("  SAMPLE (5 rows) — booked_quotes column:")
