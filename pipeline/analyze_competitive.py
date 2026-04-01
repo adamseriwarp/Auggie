@@ -11,7 +11,7 @@ import mysql.connector
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
-INPUT_CSV = "/Users/adamseri/Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv"
+INPUT_CSV = os.path.join(os.path.dirname(__file__), "data", "top_lanes_quotes_combined.csv")
 OUTPUT_CSV = os.path.join(os.path.dirname(__file__), "output", "competitive_analysis_enriched.csv")
 
 DB_CONFIG = {
@@ -133,7 +133,7 @@ def main():
 
     sql_df = query_db()
 
-    # Filter SQL results to only the 300 input routes (in Python)
+    # Filter SQL results to only the input routes (in Python)
     route_keys = set(zip(quotes["origin3"], quotes["dest3"]))
     if not sql_df.empty and "origin3" in sql_df.columns:
         sql_filtered = sql_df[sql_df.apply(lambda r: (r["origin3"], r["dest3"]) in route_keys, axis=1)]

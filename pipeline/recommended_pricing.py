@@ -3,7 +3,7 @@ Recommended Pricing
 Computes a recommended price for every route in the pricing CSV.
 
 Input:
-  ~/Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv
+  pipeline/data/top_lanes_quotes_combined.csv
   pipeline/output/demand_price_analysis.csv  (left-joined)
 
 Output:
@@ -15,7 +15,7 @@ import pandas as pd
 
 # ── paths ─────────────────────────────────────────────────────────────────────
 HERE        = pathlib.Path(__file__).parent
-QUOTES_CSV  = pathlib.Path.home() / "Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv"
+QUOTES_CSV  = HERE / "data" / "top_lanes_quotes_combined.csv"
 DEMAND_CSV  = HERE / "output" / "demand_price_analysis.csv"
 PIVOT_CSV   = HERE / "output" / "ltl_pivot_table.csv"
 JAN_CSV     = HERE / "output" / "rate_change_comparison.csv"

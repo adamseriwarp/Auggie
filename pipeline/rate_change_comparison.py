@@ -9,7 +9,7 @@ from pathlib import Path
 
 # ── paths ──────────────────────────────────────────────────────────────────────
 JAN_CSV = Path("../competitive-rates-dashboard/public/pivot_table_with_airports.csv")
-NOW_CSV = Path("/Users/adamseri/Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv")
+NOW_CSV = Path(__file__).parent / "data" / "top_lanes_quotes_combined.csv"
 OUT_DIR = Path("output")
 OUT_CSV = OUT_DIR / "rate_change_comparison.csv"
 
