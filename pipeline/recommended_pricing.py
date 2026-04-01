@@ -19,6 +19,7 @@ QUOTES_CSV  = pathlib.Path.home() / "Desktop/Code/wearewarp/LTL Quote Tool/top_l
 DEMAND_CSV  = HERE / "output" / "demand_price_analysis.csv"
 PIVOT_CSV   = HERE / "output" / "ltl_pivot_table.csv"
 JAN_CSV     = HERE / "output" / "rate_change_comparison.csv"
+ORDERS_CSV  = HERE.parent / "competitive-rates-dashboard" / "public" / "ltl_order_pnl_export_2026-01-01_2026-03-25.csv"
 OUTPUT_CSV  = HERE / "output" / "recommended_pricing.csv"
 
 # ── load ──────────────────────────────────────────────────────────────────────
@@ -26,6 +27,7 @@ quotes = pd.read_csv(QUOTES_CSV, dtype=str)
 demand = pd.read_csv(DEMAND_CSV, dtype=str)
 pivot  = pd.read_csv(PIVOT_CSV, dtype=str)
 jan    = pd.read_csv(JAN_CSV, dtype=str)
+orders = pd.read_csv(ORDERS_CSV, dtype=str)
 
 # ── clean & parse ─────────────────────────────────────────────────────────────
 def strip_dollar(series: pd.Series) -> pd.Series:
@@ -71,6 +73,22 @@ jan_slim["competitor_rate_jan"] = pd.to_numeric(jan_slim["competitor_rate_jan"],
 
 df = df.merge(jan_slim, on=["origin3", "dest3"], how="left")
 
+# ── build booked_orders_jan from PnL export ───────────────────────────────────
+orders_complete = orders[orders["shipmentStatus"] == "Complete"].copy()
+orders_complete["origin3"] = orders_complete["pickZipCode"].str.strip().str.zfill(5).str[:3]
+orders_complete["dest3"]   = orders_complete["dropZipCode"].str.strip().str.zfill(5).str[:3]
+
+booked_jan = (
+    orders_complete
+    .groupby(["origin3", "dest3"])["orderCode"]
+    .nunique()
+    .reset_index()
+    .rename(columns={"orderCode": "booked_orders_jan"})
+)
+
+df = df.merge(booked_jan, on=["origin3", "dest3"], how="left")
+df["booked_orders_jan"] = pd.to_numeric(df["booked_orders_jan"], errors="coerce").fillna(0).astype(int)
+
 # ── compute recommended pricing ───────────────────────────────────────────────
 df["recommended_price"] = (df["competitor_rate"] * 0.95).round(2)
 df["price_change"]      = (df["recommended_price"] - df["warp_rate"]).round(2)
@@ -90,7 +108,7 @@ out_cols = [
     "origin3", "dest3", "origin_zip5", "dest_zip5",
     "warp_rate", "warp_rate_jan", "competitor_rate", "competitor_rate_jan", "competitor_carrier",
     "recommended_price", "price_change", "price_change_pct", "action",
-    "total_quotes", "booked_quotes", "ltl_shipments", "quadrant",
+    "total_quotes", "booked_quotes", "booked_orders_jan", "ltl_shipments", "quadrant",
 ]
 df = df[out_cols].copy()
 df["abs_price_change"] = df["price_change"].abs()
@@ -149,5 +167,10 @@ print()
 # ── sample: 5 rows showing Jan rate columns ───────────────────────────────────
 print("  SAMPLE (5 rows) — Jan rate columns:")
 print(df[["origin3", "dest3", "warp_rate", "warp_rate_jan", "competitor_rate", "competitor_rate_jan"]].head(5).to_string(index=False))
+print()
+
+# ── sample: 5 rows showing booked_quotes, booked_orders_jan, ltl_shipments ────
+print("  SAMPLE (5 rows) — booked_quotes / booked_orders_jan / ltl_shipments:")
+print(df[["origin3", "dest3", "booked_quotes", "booked_orders_jan", "ltl_shipments"]].head(5).to_string(index=False))
 print()
 
