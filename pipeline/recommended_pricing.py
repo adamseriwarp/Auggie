@@ -18,12 +18,14 @@ HERE        = pathlib.Path(__file__).parent
 QUOTES_CSV  = pathlib.Path.home() / "Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv"
 DEMAND_CSV  = HERE / "output" / "demand_price_analysis.csv"
 PIVOT_CSV   = HERE / "output" / "ltl_pivot_table.csv"
+JAN_CSV     = HERE / "output" / "rate_change_comparison.csv"
 OUTPUT_CSV  = HERE / "output" / "recommended_pricing.csv"
 
 # ── load ──────────────────────────────────────────────────────────────────────
 quotes = pd.read_csv(QUOTES_CSV, dtype=str)
 demand = pd.read_csv(DEMAND_CSV, dtype=str)
 pivot  = pd.read_csv(PIVOT_CSV, dtype=str)
+jan    = pd.read_csv(JAN_CSV, dtype=str)
 
 # ── clean & parse ─────────────────────────────────────────────────────────────
 def strip_dollar(series: pd.Series) -> pd.Series:
@@ -59,6 +61,16 @@ pivot_slim = pivot[["origin3", "dest3", "booked_quotes"]].copy()
 df = df.merge(pivot_slim, on=["origin3", "dest3"], how="left")
 df["booked_quotes"] = pd.to_numeric(df["booked_quotes"], errors="coerce").fillna(0).astype(int)
 
+# ── left-join January rates ───────────────────────────────────────────────────
+jan["origin3"] = jan["origin3"].str.strip()
+jan["dest3"]   = jan["dest3"].str.strip()
+
+jan_slim = jan[["origin3", "dest3", "warp_rate_jan", "competitor_rate_jan"]].copy()
+jan_slim["warp_rate_jan"]       = pd.to_numeric(jan_slim["warp_rate_jan"],       errors="coerce")
+jan_slim["competitor_rate_jan"] = pd.to_numeric(jan_slim["competitor_rate_jan"], errors="coerce")
+
+df = df.merge(jan_slim, on=["origin3", "dest3"], how="left")
+
 # ── compute recommended pricing ───────────────────────────────────────────────
 df["recommended_price"] = (df["competitor_rate"] * 0.95).round(2)
 df["price_change"]      = (df["recommended_price"] - df["warp_rate"]).round(2)
@@ -76,7 +88,7 @@ df["action"] = df["price_change"].apply(assign_action)
 # ── select & sort output columns ──────────────────────────────────────────────
 out_cols = [
     "origin3", "dest3", "origin_zip5", "dest_zip5",
-    "warp_rate", "competitor_rate", "competitor_carrier",
+    "warp_rate", "warp_rate_jan", "competitor_rate", "competitor_rate_jan", "competitor_carrier",
     "recommended_price", "price_change", "price_change_pct", "action",
     "total_quotes", "booked_quotes", "ltl_shipments", "quadrant",
 ]
@@ -132,5 +144,10 @@ print("=" * 70 + "\n")
 # ── sample: 5 rows showing booked_quotes ──────────────────────────────────────
 print("  SAMPLE (5 rows) — booked_quotes column:")
 print(df[["origin3", "dest3", "total_quotes", "booked_quotes", "action"]].head(5).to_string(index=False))
+print()
+
+# ── sample: 5 rows showing Jan rate columns ───────────────────────────────────
+print("  SAMPLE (5 rows) — Jan rate columns:")
+print(df[["origin3", "dest3", "warp_rate", "warp_rate_jan", "competitor_rate", "competitor_rate_jan"]].head(5).to_string(index=False))
 print()
 
