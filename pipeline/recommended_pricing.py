@@ -17,11 +17,13 @@ import pandas as pd
 HERE        = pathlib.Path(__file__).parent
 QUOTES_CSV  = pathlib.Path.home() / "Desktop/Code/wearewarp/LTL Quote Tool/top_lanes_quotes_output.csv"
 DEMAND_CSV  = HERE / "output" / "demand_price_analysis.csv"
+PIVOT_CSV   = HERE / "output" / "ltl_pivot_table.csv"
 OUTPUT_CSV  = HERE / "output" / "recommended_pricing.csv"
 
 # ── load ──────────────────────────────────────────────────────────────────────
 quotes = pd.read_csv(QUOTES_CSV, dtype=str)
 demand = pd.read_csv(DEMAND_CSV, dtype=str)
+pivot  = pd.read_csv(PIVOT_CSV, dtype=str)
 
 # ── clean & parse ─────────────────────────────────────────────────────────────
 def strip_dollar(series: pd.Series) -> pd.Series:
@@ -48,6 +50,15 @@ demand_slim = demand[demand_cols].copy()
 
 df = quotes.merge(demand_slim, on=["origin3", "dest3"], how="left")
 
+# ── left-join booked_quotes from pivot table ──────────────────────────────────
+pivot["origin3"] = pivot["origin3"].str.strip()
+pivot["dest3"]   = pivot["dest3"].str.strip()
+
+pivot_slim = pivot[["origin3", "dest3", "booked_quotes"]].copy()
+
+df = df.merge(pivot_slim, on=["origin3", "dest3"], how="left")
+df["booked_quotes"] = pd.to_numeric(df["booked_quotes"], errors="coerce").fillna(0).astype(int)
+
 # ── compute recommended pricing ───────────────────────────────────────────────
 df["recommended_price"] = (df["competitor_rate"] * 0.95).round(2)
 df["price_change"]      = (df["recommended_price"] - df["warp_rate"]).round(2)
@@ -67,7 +78,7 @@ out_cols = [
     "origin3", "dest3", "origin_zip5", "dest_zip5",
     "warp_rate", "competitor_rate", "competitor_carrier",
     "recommended_price", "price_change", "price_change_pct", "action",
-    "total_quotes", "ltl_shipments", "quadrant",
+    "total_quotes", "booked_quotes", "ltl_shipments", "quadrant",
 ]
 df = df[out_cols].copy()
 df["abs_price_change"] = df["price_change"].abs()
@@ -117,4 +128,9 @@ for _, r in top10.iterrows():
 print("\n" + "=" * 70)
 print(f"  ✓  Saved {OUTPUT_CSV.relative_to(HERE.parent)}")
 print("=" * 70 + "\n")
+
+# ── sample: 5 rows showing booked_quotes ──────────────────────────────────────
+print("  SAMPLE (5 rows) — booked_quotes column:")
+print(df[["origin3", "dest3", "total_quotes", "booked_quotes", "action"]].head(5).to_string(index=False))
+print()
 
